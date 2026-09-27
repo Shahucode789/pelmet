@@ -979,7 +979,9 @@ private struct PelmetItemsStrip: View {
                 ) { toggleKind(.mediaControls, on: $0) }
                 PelmetItemRow(
                     symbol: "video.fill", title: "Camera & mic indicator",
-                    caption: "Know when your camera, mic or SharePlay is on.",
+                    caption: appState.screenRecordingGranted
+                        ? "Know when your camera, mic or SharePlay is on."
+                        : "Know when your camera, mic or SharePlay is on. Without Screen Recording the hidden icons flash by for an instant when you click it.",
                     isOn: hasKind(.cameraMicIndicator)
                 ) { toggleKind(.cameraMicIndicator, on: $0) }
                 PelmetItemRow(

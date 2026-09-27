@@ -7309,6 +7309,64 @@
         }
       }
     },
+    "Know when your camera, mic or SharePlay is on. Without Screen Recording the hidden icons flash by for an instant when you click it.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wisse, wann Kamera, Mikrofon oder SharePlay an sind. Ohne Bildschirmaufnahme blitzen die ausgeblendeten Symbole beim Klick kurz auf."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sabe cuándo tu cámara, micrófono o SharePlay están activos. Sin Grabación de pantalla, los iconos ocultos aparecen un instante al hacer clic."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sachez quand votre caméra, votre micro ou SharePlay est actif. Sans Enregistrement de l'écran, les icônes masquées apparaissent un instant au clic."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sai quando la fotocamera, il microfono o SharePlay sono attivi. Senza Registrazione schermo le icone nascoste compaiono per un istante al clic."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カメラ、マイク、SharePlayがオンのときにわかります。画面収録がないと、クリック時に隠れたアイコンが一瞬映ります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "카메라, 마이크 또는 SharePlay가 켜져 있을 때 알 수 있습니다. 화면 기록 권한이 없으면 클릭할 때 숨긴 아이콘이 잠깐 스쳐 보입니다."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saiba quando sua câmera, microfone ou SharePlay estão ligados. Sem Gravação de Tela, os ícones ocultos aparecem por um instante ao clicar."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Знайте, когда включены камера, микрофон или SharePlay. Без записи экрана при щелчке скрытые значки мелькают на мгновение."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "随时知道摄像头、麦克风或同播共享是否开启。没有屏幕录制权限时，点击它会让隐藏的图标闪现一下。"
+          }
+        }
+      }
+    },
     "Language": {
       "localizations": {
         "de": {
