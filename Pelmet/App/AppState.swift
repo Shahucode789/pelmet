@@ -1418,6 +1418,8 @@ final class AppState {
     private var ownItemsAwaitingReveal: Set<ItemID> = []
     /// Own items that already got their one retry after a failed pass.
     private var ownItemsRetried: Set<ItemID> = []
+    /// Passes that found the item not laid out yet, by item.
+    private var ownItemMisses: [ItemID: Int] = [:]
     /// When the boot adoption saw every own item; nil until then.
     private var ownItemsAdoptedAt: ContinuousClock.Instant?
 
@@ -1443,7 +1445,12 @@ final class AppState {
         // A pass reveals too; leave the queue for a user reveal then.
         guard !applying, !ownItemsAwaitingReveal.isEmpty else { return }
         let revealed = currentRevealedSections
-        let due = ownItemsAwaitingReveal.filter { revealed.contains(settings.sectionModel.section(of: $0)) }
+        // Visible is on screen at every reveal: an item that missed its pass
+        // there goes through the door at the next one too.
+        let due = ownItemsAwaitingReveal.filter {
+            let section = settings.sectionModel.section(of: $0)
+            return section == .visible || revealed.contains(section)
+        }
         guard !due.isEmpty else { return }
         ownItemsAwaitingReveal.subtract(due)
         Task {
@@ -1451,10 +1458,10 @@ final class AppState {
         }
     }
 
-    func placeOwnItemSoon(_ id: ItemID) {
+    func placeOwnItemSoon(_ id: ItemID, after lead: Duration = AppTiming.newExtraPlacementDelay) {
         ownItemPassLeads[id]?.cancel()
         ownItemPassLeads[id] = Task { [weak self] in
-            try? await Task.sleep(for: AppTiming.newExtraPlacementDelay)
+            try? await Task.sleep(for: lead)
             guard !Task.isCancelled, let self else { return }
             ownItemPassLeads.removeValue(forKey: id)
             await placeOwnItemNow(id)
@@ -1499,12 +1506,33 @@ final class AppState {
         let report = await ApplyPass.run(appState: self, scope: .ownItem(id))
         PelmetLog.log("apply: own \(id.rawValue) applied=\(report.applied.count) failed=\(report.failed.count) skipped=\(report.skipped.count)")
         if !report.applied.isEmpty { await engine.writeOrderHint() }
+        // Not laid out yet: a brand-new item reaches the bar's AX tree on
+        // the agent's beat, and a shortcut added on a concealed bar was not
+        // there 640ms later, so it stayed left of the chevron in Visible
+        // (2026-09-28). One more pass after a longer wait, then the next
+        // reveal settle, then it is Apply's.
+        let missed = report.skipped.contains { $0.item == id.sectionKey && $0.why == .notOnScreen }
+        if missed {
+            let misses = (ownItemMisses[id] ?? 0) + 1
+            ownItemMisses[id] = misses
+            switch misses {
+            case 1:
+                PelmetLog.log("apply: own \(id.rawValue) not on screen yet — one more pass shortly")
+                placeOwnItemSoon(id, after: AppTiming.ownItemRetryDelay)
+            case 2:
+                PelmetLog.log("apply: own \(id.rawValue) still not on screen — waits for a reveal")
+                ownItemsAwaitingReveal.insert(id)
+            default:
+                PelmetLog.log("apply: own \(id.rawValue) never on screen — left to Apply")
+                ownItemMisses.removeValue(forKey: id)
+            }
         // A failed move on a concealable section gets one more try at the
         // next reveal settle (the bar may have concealed mid-pass).
-        if !report.failed.isEmpty, section != .visible, ownItemsRetried.insert(id).inserted {
+        } else if !report.failed.isEmpty, section != .visible, ownItemsRetried.insert(id).inserted {
             ownItemsAwaitingReveal.insert(id)
         } else if !report.applied.isEmpty {
             ownItemsRetried.remove(id)
+            ownItemMisses.removeValue(forKey: id)
         }
     }
 

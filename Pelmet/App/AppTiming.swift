@@ -108,6 +108,8 @@ enum AppTiming {
     static let tidyRevealWait: Duration = .seconds(1.2)
     /// An own extra entering the bar is hosted before its one-item pass.
     static let newExtraPlacementDelay: Duration = .milliseconds(600)
+    /// The second pass for an own item the first one found not laid out.
+    static let ownItemRetryDelay: Duration = .milliseconds(1500)
     /// The boot own-item passes wait this long after the own items were
     /// adopted: 235ms after adoption the bar is still attaching (frames
     /// overlap, the chevron reads as trapped) and the pass planned on it —
