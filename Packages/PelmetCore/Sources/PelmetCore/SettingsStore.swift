@@ -158,6 +158,13 @@ public enum ExtraKind: String, Codable, CaseIterable, Sendable {
     case timer
     /// Fast user switching menu — the system one is collateral-hidden too.
     case userSwitching
+    /// The user's Shortcuts library as a menu. On macOS 27 menu bar
+    /// shortcuts are a Control Center control, and every hide assertion
+    /// takes controls off the bar whatever the allowlist names (probed
+    /// 2026-09-28). The "Menu Bar" collection itself is unreadable (the
+    /// Shortcuts library is TCC-protected, the CLI only knows real
+    /// folders), so the menu lists the whole library, folders as submenus.
+    case shortcutsMenu
     /// Time Machine status and Back Up Now. Apple's own is a SystemUIServer
     /// extra: the assertion hides that process as one bundle, so Siri and
     /// Time Machine could only ever hide together (#19). A Pelmet-drawn
@@ -215,10 +222,11 @@ public enum ExtraStyle: String, Codable, CaseIterable, Sendable {
 extension ExtraKind {
     /// The kinds that stand in for a collateral-hidden system extra
     /// (Now Playing, the camera pill and SharePlay, AirDrop, Focus, the
-    /// Clock timer, fast user switching). Siri and Time Machine replace
-    /// SystemUIServer items, which hide by the allowlist like any app.
+    /// Clock timer, fast user switching, the Shortcuts control). Siri and
+    /// Time Machine replace SystemUIServer items, which hide by the
+    /// allowlist like any app.
     public static let collateralReplicas: Set<ExtraKind> = [
-        .mediaControls, .cameraMicIndicator, .airdrop, .focus, .timer, .userSwitching,
+        .mediaControls, .cameraMicIndicator, .airdrop, .focus, .timer, .userSwitching, .shortcutsMenu,
     ]
 }
 
@@ -274,6 +282,7 @@ public struct ExtraItemSpec: Codable, Equatable, Identifiable, Sendable {
         case .appLauncher: "Pelmet.App.\(id.uuidString)"
         case .timer: "Pelmet.Timer"
         case .userSwitching: "Pelmet.Users"
+        case .shortcutsMenu: "Pelmet.Shortcuts"
         case .timeMachine: "Pelmet.TimeMachine"
         case .siri: "Pelmet.Siri"
         case .focus: "Pelmet.Focus"

@@ -437,6 +437,7 @@ private struct ItemTile: View {
         case .airdrop: return String(localized: "AirDrop")
         case .timer: return String(localized: "Timer")
         case .userSwitching: return String(localized: "Users")
+        case .shortcutsMenu: return String(localized: "Shortcuts")
         case .timeMachine: return String(localized: "Time Machine")
         case .siri: return String(localized: "Siri")
         case .focus: return String(localized: "Focus")
@@ -1016,6 +1017,11 @@ private struct PelmetItemsStrip: View {
                     caption: "Switch user or lock the screen in a click.",
                     isOn: hasKind(.userSwitching)
                 ) { toggleKind(.userSwitching, on: $0) }
+                PelmetItemRow(
+                    symbol: "square.2.layers.3d.top.filled", title: "Shortcuts",
+                    caption: "Your whole Shortcuts library in one menu.",
+                    isOn: hasKind(.shortcutsMenu)
+                ) { toggleKind(.shortcutsMenu, on: $0) }
                 ForEach(appState.settings.extraItems.filter { $0.kind == .shortcut }) { spec in
                     HStack(spacing: 8) {
                         Image(systemName: spec.symbol ?? "bolt.fill")

@@ -73,6 +73,7 @@ public extension ItemID {
         case appLauncher
         case timer
         case userSwitching
+        case shortcutsMenu
         case timeMachine
         case siri
         case focus
@@ -94,6 +95,7 @@ public extension ItemID {
         case "Pelmet.AirDrop": return .airdrop
         case "Pelmet.Timer": return .timer
         case "Pelmet.Users": return .userSwitching
+        case "Pelmet.Shortcuts": return .shortcutsMenu
         case "Pelmet.TimeMachine": return .timeMachine
         case "Pelmet.Siri": return .siri
         case "Pelmet.Focus": return .focus

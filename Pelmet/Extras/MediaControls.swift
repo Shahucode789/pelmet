@@ -421,7 +421,7 @@ final class ExtrasManager {
                     appState?.cancelOwnItemPlacement(itemID)
                 }
                 lastFocusActive = active
-            case .shortcut, .userSwitching, .siri:
+            case .shortcut, .userSwitching, .shortcutsMenu, .siri:
                 break
             }
             setVisible(visible, for: id, item: item)
@@ -466,7 +466,7 @@ final class ExtrasManager {
         for (id, item) in items {
             guard let spec = specs[id], lastVisible[id] != true else { continue }
             switch spec.kind {
-            case .airdrop, .shortcut, .userSwitching, .siri: break
+            case .airdrop, .shortcut, .userSwitching, .shortcutsMenu, .siri: break
             case .timer:
                 // Counting: already in the bar on its own.
                 guard !(pelmetTimer?.isActive ?? false) else { continue }
@@ -607,6 +607,7 @@ final class ExtrasManager {
         case .appLauncher: spec.symbol ?? "app.dashed"
         case .timer: "timer"
         case .userSwitching: "person.crop.circle"
+        case .shortcutsMenu: "square.2.layers.3d.top.filled"
         case .timeMachine: ExtraGlyph.timeMachineSymbol
         case .siri: "siri"
         case .focus: "moon.fill"
@@ -846,7 +847,7 @@ final class ExtrasManager {
         case .timer: updateTimerGlyph(item, spec: spec)
         case .timeMachine: updateTimeMachineGlyph(item, spec: spec)
         case .focus: updateFocusGlyph(item, spec: spec)
-        case .shortcut, .appLauncher, .userSwitching, .siri: break
+        case .shortcut, .appLauncher, .userSwitching, .shortcutsMenu, .siri: break
         }
     }
 
@@ -1042,6 +1043,13 @@ final class ExtrasManager {
             }
         case .userSwitching:
             popUp(usersMenu(), on: statusItem.value)
+        case .shortcutsMenu:
+            // Read fresh each open (~15ms a CLI call), off the main thread.
+            Task { @MainActor [weak self] in
+                let library = await Task.detached { Self.shortcutsLibrary() }.value
+                guard let self else { return }
+                popUp(shortcutsMenu(library), on: statusItem.value)
+            }
         case .timeMachine:
             // Fresh for the next open; this one shows what the poll last saw.
             timeMachine?.refresh()
@@ -1202,6 +1210,47 @@ final class ExtrasManager {
     @objc private func lockScreen() { UserSwitching.lockScreen() }
     @objc private func usersSettings() { UserSwitching.openUsersSettings() }
 
+    /// Unfiled shortcuts first, in library order, then each folder as a
+    /// submenu. Entries run by identifier: two shortcuts can share a name.
+    private func shortcutsMenu(_ library: ShortcutsLibrary) -> NSMenu {
+        let menu = NSMenu()
+        func entry(_ shortcut: ShortcutsLibrary.Entry) -> NSMenuItem {
+            let item = NSMenuItem(title: shortcut.name, action: #selector(runMenuShortcut(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = shortcut.id
+            return item
+        }
+        if library.isEmpty {
+            let none = NSMenuItem(title: String(localized: "No shortcuts in your library"), action: nil, keyEquivalent: "")
+            none.isEnabled = false
+            menu.addItem(none)
+        }
+        for shortcut in library.unfiled { menu.addItem(entry(shortcut)) }
+        if !library.unfiled.isEmpty, !library.folders.isEmpty { menu.addItem(.separator()) }
+        for folder in library.folders {
+            let sub = NSMenu()
+            for shortcut in folder.shortcuts { sub.addItem(entry(shortcut)) }
+            let item = NSMenuItem(title: folder.name, action: nil, keyEquivalent: "")
+            item.submenu = sub
+            menu.addItem(item)
+        }
+        menu.addItem(.separator())
+        let open = NSMenuItem(title: String(localized: "Open Shortcuts"), action: #selector(openShortcutsApp), keyEquivalent: "")
+        open.target = self
+        menu.addItem(open)
+        return menu
+    }
+
+    @objc private func runMenuShortcut(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        runShortcut(named: id)
+    }
+
+    @objc private func openShortcutsApp() {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.shortcuts") else { return }
+        NSWorkspace.shared.openApplication(at: url, configuration: .init())
+    }
+
     // MARK: Time Machine menu
 
     /// Apple's menu, line for line: the state on top, then the verbs.
@@ -1308,9 +1357,26 @@ final class ExtrasManager {
 
     /// Names from the user's Shortcuts library (for the picker).
     nonisolated static func availableShortcuts() -> [String] {
+        shortcutsCLI(["list"])
+    }
+
+    /// The library as the Shortcuts CLI sees it: real folders only (the
+    /// Share Sheet / Menu Bar collections are not folders to it).
+    nonisolated static func shortcutsLibrary() -> ShortcutsLibrary {
+        func entries(in folder: String) -> [ShortcutsLibrary.Entry] {
+            shortcutsCLI(["list", "--folder-name", folder, "--show-identifiers"]).compactMap(ShortcutsLibrary.Entry.init(line:))
+        }
+        let folders = shortcutsCLI(["list", "--folders"])
+            .filter { $0 != "none" }
+            .map { (name: $0, shortcuts: entries(in: $0)) }
+            .filter { !$0.shortcuts.isEmpty }
+        return ShortcutsLibrary(unfiled: entries(in: "none"), folders: folders)
+    }
+
+    private nonisolated static func shortcutsCLI(_ arguments: [String]) -> [String] {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/shortcuts")
-        process.arguments = ["list"]
+        process.arguments = arguments
         let pipe = Pipe()
         process.standardOutput = pipe
         guard (try? process.run()) != nil else { return [] }
@@ -1323,6 +1389,30 @@ final class ExtrasManager {
             .map(String.init)
             .filter { !$0.isEmpty }
     }
+}
+
+// MARK: - Shortcuts library
+
+/// What the Shortcuts menu lists, read through `/usr/bin/shortcuts`.
+nonisolated struct ShortcutsLibrary: Sendable {
+    struct Entry: Sendable {
+        let name: String
+        let id: String
+
+        /// One `list --show-identifiers` line: `Name (UUID)`.
+        init?(line: String) {
+            guard line.hasSuffix(")"), let open = line.lastIndex(of: "(") else { return nil }
+            let id = String(line[line.index(after: open)..<line.index(before: line.endIndex)])
+            guard UUID(uuidString: id) != nil else { return nil }
+            self.name = String(line[..<open]).trimmingCharacters(in: .whitespaces)
+            self.id = id
+        }
+    }
+
+    var unfiled: [Entry]
+    var folders: [(name: String, shortcuts: [Entry])]
+
+    var isEmpty: Bool { unfiled.isEmpty && folders.isEmpty }
 }
 
 // MARK: - Camera / mic activity
