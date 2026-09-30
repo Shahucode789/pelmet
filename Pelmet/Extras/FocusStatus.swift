@@ -24,6 +24,8 @@ final class FocusStatus {
 
     private var stream: Process?
     private var stopped = false
+    /// Transitions the stream has applied; the boot read yields to them.
+    private var streamed = 0
     private var restarts = 0
     /// Pelmet quitting takes the child with it — a `Process` outlives its
     /// parent, and a `log stream` left behind at every relaunch was found
@@ -31,9 +33,11 @@ final class FocusStatus {
     private var termination: NSObjectProtocol?
 
     /// donotdisturbd's one line per transition; the state it carries is
-    /// what `FocusLogParser` reads.
+    /// what `FocusLogParser` reads. Its assertion snapshots ride along: a
+    /// Focus that ends while the Mac sleeps (a location one run from the
+    /// iPhone) comes back at wake as an empty snapshot and no state line (#70).
     nonisolated private static let predicate =
-        #"process == "donotdisturbd" AND category == "ServiceProvider" AND eventMessage BEGINSWITH "Did receive state update""#
+        #"process == "donotdisturbd" AND ((category == "ServiceProvider" AND eventMessage BEGINSWITH "Did receive state update") OR (category == "StateProvider" AND eventMessage BEGINSWITH "Calculate DND state for snapshot"))"#
 
     func start() {
         stopped = false
@@ -70,17 +74,26 @@ final class FocusStatus {
     /// The last transition on record. An hour covers a mode switched
     /// moments before a relaunch; a day catches the ones that outlive it
     /// (a Sleep schedule, a Do Not Disturb left on). Nothing in a day
-    /// reads as off — Focus is off far more often than not.
+    /// reads as off — Focus is off far more often than not — unless a
+    /// snapshot in it still holds an assertion: a Focus on for days (the
+    /// reboot in #70 logged snapshots only) is named a week back.
     private func recover() {
+        let seen = streamed
         Task.detached(priority: .utility) { [weak self] in
             var found: String?
-            for window in ["1h", "24h"] where found == nil {
-                let lines = Self.run(["show", "--last", window, "--style", "ndjson", "--predicate", Self.predicate])
-                found = lines.compactMap(Self.message(in:)).last
+            var held = false
+            for window in ["1h", "24h", "7d"] where found == nil {
+                if window == "7d", !held { break }
+                let messages = Self.run(["show", "--last", window, "--style", "ndjson", "--predicate", Self.predicate])
+                    .compactMap(Self.message(in:))
+                found = messages.last(where: Self.isDecisive)
+                held = messages.contains { $0.hasPrefix(FocusLogParser.snapshotPrefix) }
             }
             let mode = found.flatMap(FocusLogParser.activeMode(in:))
             await MainActor.run { [weak self] in
                 guard let self, !self.stopped else { return }
+                // A transition the stream caught while `log show` ran is newer.
+                guard self.streamed == seen else { return }
                 PelmetLog.log("focus: boot \(mode.map { "\($0.name) (\($0.symbol))" } ?? "off")\(found == nil ? ", no transition on record" : "")")
                 self.active = mode
             }
@@ -95,25 +108,30 @@ final class FocusStatus {
         process.arguments = ["stream", "--style", "ndjson", "--predicate", Self.predicate]
         let pipe = Pipe()
         process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
+        let errors = Pipe()
+        process.standardError = errors
         let lines = LineSplitter()
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let chunk = handle.availableData
             guard !chunk.isEmpty else { handle.readabilityHandler = nil; return }
             for text in lines.split(appending: chunk) {
-                guard let message = Self.message(in: text) else { continue }
+                guard let message = Self.message(in: text), Self.isDecisive(message) else { continue }
                 let mode = FocusLogParser.activeMode(in: message)
                 Task { @MainActor [weak self] in
                     guard let self, !self.stopped else { return }
                     if mode != self.active {
                         PelmetLog.log("focus: \(mode.map { "on — \($0.name) (\($0.symbol))" } ?? "off")")
                     }
+                    self.streamed += 1
                     self.active = mode
                 }
             }
         }
         process.terminationHandler = { [weak self] _ in
-            Task { @MainActor [weak self] in self?.streamEnded() }
+            // Why `log` quit, when it says (it has a "Must be admin" refusal).
+            let why = String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+                .split(separator: "\n").first.map(String.init) ?? ""
+            Task { @MainActor [weak self] in self?.streamEnded(why) }
         }
         do {
             try process.run()
@@ -125,12 +143,12 @@ final class FocusStatus {
 
     /// logd restarts (or a kill) end the child; come back with a backoff so
     /// a machine where `log stream` is refused doesn't spin.
-    private func streamEnded() {
+    private func streamEnded(_ why: String) {
         stream = nil
         guard !stopped else { return }
         restarts += 1
         let delay = min(60, 2 << min(restarts, 5))
-        PelmetLog.log("focus: log stream ended, retry in \(delay)s")
+        PelmetLog.log("focus: log stream ended\(why.isEmpty ? "" : " (\(why.prefix(120)))"), retry in \(delay)s")
         Task { [weak self] in
             try? await Task.sleep(for: .seconds(delay))
             guard let self, !self.stopped, self.stream == nil else { return }
@@ -141,11 +159,19 @@ final class FocusStatus {
 
     // MARK: Plumbing
 
+    /// A state update, or a snapshot that says no Focus is on. A snapshot
+    /// still naming an assertion leaves the mode to the state update beside it.
+    nonisolated private static func isDecisive(_ message: String) -> Bool {
+        !message.hasPrefix(FocusLogParser.snapshotPrefix) || FocusLogParser.snapshotSaysOff(message)
+    }
+
     /// The `eventMessage` of one ndjson line; nil for the header line the
-    /// stream prints first and the trailing count `log show` appends.
+    /// stream prints first, the trailing count `log show` appends, and
+    /// another logged-in user's lines (donotdisturbd runs once per user).
     nonisolated private static func message(in line: String) -> String? {
         guard line.hasPrefix("{"),
-              let object = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
+              let object = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+              (object["userID"] as? Int).map({ $0 == Int(getuid()) }) ?? true
         else { return nil }
         return object["eventMessage"] as? String
     }
@@ -206,6 +232,8 @@ final class FocusStatus {
 /// never read at click time: `moduleOpen` remembers what Pelmet put up
 /// (a watcher clears it when the panel goes away), and an open waits for
 /// the dismissal to finish before pressing the item, which is a toggle.
+/// A panel that comes up without the Focus tile stays up for the user; no
+/// panel at all opens Focus settings, so a click never does nothing (#70).
 @MainActor
 enum ControlCenterFocus {
     private static var moduleOpen = false
@@ -234,7 +262,7 @@ enum ControlCenterFocus {
             for _ in 0..<300 {
                 try? await Task.sleep(for: .milliseconds(200))
                 if Task.isCancelled { return }
-                let up = await Task.detached { panel() != nil }.value
+                let up = await Task.detached { !panels().isEmpty }.value
                 if !up { break }
             }
             moduleOpen = false
@@ -243,45 +271,72 @@ enum ControlCenterFocus {
 
     nonisolated private static func open() async -> Bool {
         // A panel the click dismissed is still coming down.
-        for _ in 0..<16 where panel() != nil {
+        for _ in 0..<16 where !panels().isEmpty {
             try? await Task.sleep(for: .milliseconds(25))
         }
         guard let agent = NSRunningApplication.runningApplications(withBundleIdentifier: PelmetBundle.agentID).first,
               let item = find(in: AXUIElementCreateApplication(agent.processIdentifier), depth: 8, where: {
                   attribute($0, kAXIdentifierAttribute) == "com.apple.menuextra.controlcenter"
               })
-        else { PelmetLog.log("focus: Control Center item not found"); return false }
+        else {
+            PelmetLog.log("focus: Control Center item not found, opening Focus settings")
+            await openSettings()
+            return false
+        }
         AXUIElementPerformAction(item, kAXPressAction as CFString)
         // The panel takes a few frames to build; the tile appears with it.
         for _ in 0..<80 {
             try? await Task.sleep(for: .milliseconds(20))
-            if let panel = panel(), showFocusModule(in: panel) { return true }
+            if panels().contains(where: showFocusModule(in:)) { return true }
         }
-        PelmetLog.log("focus: Control Center panel never showed the Focus tile")
-        return false
+        let windows = panels()
+        guard !windows.isEmpty else {
+            PelmetLog.log("focus: Control Center panel never opened, opening Focus settings")
+            await openSettings()
+            return false
+        }
+        let tiles = windows.flatMap { modules(in: $0, depth: 8) }
+        PelmetLog.log("focus: Control Center panel has no Focus tile (\(windows.count) window(s), modules: \(tiles.joined(separator: ", ")))")
+        return true
+    }
+
+    @MainActor static func openSettings() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Focus-Settings.extension")!)
     }
 
     /// The Focus tile's "show details" custom action, the one that swaps
-    /// the panel to the Focus module. False when the tile isn't there.
+    /// the panel to the Focus module. Its name is localized ("Details
+    /// einblenden"), so it's taken as the tile's one custom action. False
+    /// when the tile isn't there.
     nonisolated private static func showFocusModule(in panel: AXUIElement) -> Bool {
-        guard let tile = find(in: panel, depth: 6, where: { attribute($0, kAXIdentifierAttribute) == "module-FocusModes" }),
+        guard let tile = find(in: panel, depth: 8, where: { attribute($0, kAXIdentifierAttribute) == "module-FocusModes" }),
               let box = find(in: tile, depth: 2, where: { attribute($0, kAXRoleAttribute) == kAXCheckBoxRole })
         else { return false }
         var names: CFArray?
         AXUIElementCopyActionNames(box, &names)
-        guard let details = ((names as? [String]) ?? []).first(where: { $0.hasPrefix("Name:show details") })
+        guard let details = ((names as? [String]) ?? []).first(where: { $0.hasPrefix("Name:") })
         else { PelmetLog.log("focus: Focus tile has no details action"); return true }
         AXUIElementPerformAction(box, details as CFString)
         return true
     }
 
-    /// Control Center's panel window, nil while none is up.
-    nonisolated private static func panel() -> AXUIElement? {
+    /// Control Center's windows, empty while none is up. Searched whole, in
+    /// case the panel isn't the first.
+    nonisolated private static func panels() -> [AXUIElement] {
         guard let controlCenter = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.controlcenter").first
-        else { return nil }
+        else { return [] }
         var value: AnyObject?
         AXUIElementCopyAttributeValue(AXUIElementCreateApplication(controlCenter.processIdentifier), kAXWindowsAttribute as CFString, &value)
-        return (value as? [AXUIElement])?.first
+        return (value as? [AXUIElement]) ?? []
+    }
+
+    /// The panel's `module-…` tiles, named in the log when Focus isn't one.
+    nonisolated private static func modules(in element: AXUIElement, depth: Int) -> [String] {
+        let own = attribute(element, kAXIdentifierAttribute).flatMap { $0.hasPrefix("module-") ? [String($0.dropFirst(7))] : nil } ?? []
+        guard depth > 0 else { return own }
+        var children: AnyObject?
+        AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &children)
+        return own + ((children as? [AXUIElement]) ?? []).flatMap { modules(in: $0, depth: depth - 1) }
     }
 
     nonisolated private static func attribute(_ element: AXUIElement, _ name: String) -> String? {

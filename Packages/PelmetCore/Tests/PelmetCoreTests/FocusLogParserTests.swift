@@ -28,6 +28,24 @@ struct FocusLogParserTests {
         #expect(FocusLogParser.activeMode(in: line) == FocusMode(identifier: "5E1F", name: "Deep Work", symbol: "moon.fill"))
     }
 
+    // Snapshot messages as `log stream --style ndjson` hands them out (2026-09-29)
+    static let snapshotOff = "Calculate DND state for snapshot: activeAssertionUUIDs=(\n)"
+    static let snapshotOn = "Calculate DND state for snapshot: activeAssertionUUIDs=(\n    \"BB22EB4E-8C73-4F6D-84A7-9E1A4C75FC39\"\n)"
+
+    @Test func anEmptySnapshotReadsOff() {
+        #expect(FocusLogParser.snapshotSaysOff(Self.snapshotOff))
+    }
+
+    @Test func aSnapshotNamingAnAssertionLeavesTheStateToTheUpdate() {
+        #expect(!FocusLogParser.snapshotSaysOff(Self.snapshotOn))
+        #expect(FocusLogParser.activeMode(in: Self.snapshotOn) == nil)
+    }
+
+    @Test func aStateUpdateIsNotASnapshot() {
+        #expect(!FocusLogParser.snapshotSaysOff(Self.off))
+        #expect(!FocusLogParser.snapshotSaysOff(Self.on))
+    }
+
     @Test func aLineCutBeforeActiveModeIdentifierStillReadsTheModeBlock() {
         let cut = String(Self.on.prefix(upTo: Self.on.range(of: "; activeModeIdentifier:")!.lowerBound))
         #expect(FocusLogParser.activeMode(in: cut)?.identifier == "com.apple.donotdisturb.mode.default")

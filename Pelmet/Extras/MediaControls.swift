@@ -1316,9 +1316,7 @@ final class ExtrasManager {
     @objc private func browseBackups() { TimeMachineBackup.browseBackups() }
     @objc private func timeMachineSettings() { TimeMachineBackup.openSettings() }
     @objc private func siriSettings() { Siri.openSettings() }
-    @objc private func focusSettings() {
-        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Focus-Settings.extension")!)
-    }
+    @objc private func focusSettings() { ControlCenterFocus.openSettings() }
 
     private func openAirDrop() {
         // Finder's AirDrop view via its keyboard shortcut (⇧⌘R) — the only
