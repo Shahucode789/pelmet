@@ -25,7 +25,7 @@ no analytics.
 > [![Latest beta](https://img.shields.io/github/v/release/fif7y/pelmet?include_prereleases&filter=*beta*&label=latest%20beta&color=6841ED)](https://github.com/fif7y/pelmet/releases?q=prerelease%3Atrue)
 
 <p align="center">
-  <img src="docs/assets/bar-anim.svg" alt="The menu bar: hidden icons tuck away behind the chevron, then return on hover" width="575"><br>
+  <img src="https://pelmet.fif7y.com/assets/bar-anim.svg" alt="The menu bar: hidden icons tuck away behind the chevron, then return on hover" width="575"><br>
   <sub>Collapsed, and a hover later.</sub>
 </p>
 
@@ -41,7 +41,7 @@ chevron right in the menu bar. Pelmet records the move and never moves an
 icon on its own.
 
 <p align="center">
-  <img src="docs/assets/apply-loop.gif" alt="The layout editor under the menu bar: Spotify is dragged from Hidden to Visible, nothing moves in the bar, Apply lights up, one press and Spotify appears in the bar" width="640"><br>
+  <img src="https://pelmet.fif7y.com/assets/apply-loop.gif" alt="The layout editor under the menu bar: Spotify is dragged from Hidden to Visible, nothing moves in the bar, Apply lights up, one press and Spotify appears in the bar" width="640"><br>
   <sub>The layout editor is a drawing. Drag icons between Visible, Hidden and Always&nbsp;Hidden; nothing moves in the bar until you press Apply.</sub>
 </p>
 
