@@ -38,11 +38,65 @@ final class MenuBarBandMonitor {
     private var hoverSuppressedUntilExit = false
     private var lastDisplayUUID: String?
 
+    /// Per-screen geometry the mouse-move path reads on EVERY event, cached.
+    /// `NSScreen.screens`, `visibleFrame`, the notch areas and the display
+    /// UUID (a `deviceDescription` dictionary per call) each allocate or
+    /// round-trip, and together they were about half of what a pointer
+    /// move off the bar cost (perf audit 2026-10-02: 0.44ms and ~6 context
+    /// switches a move, ~4% CPU under a moving mouse). Screens change
+    /// rarely; the cache rebuilds on the notification.
+    private struct ScreenGeometry {
+        let screen: NSScreen
+        let frame: NSRect
+        /// The menu bar band, `.zero` on a screen with no bar.
+        let band: NSRect
+        /// The hardware cutout's open x span: nothing draws there, so it is
+        /// never the bar (2026-09-12: a pointer crossing it on the way to
+        /// Sconce's notch surface read as a bar hover).
+        let notch: (minX: CGFloat, maxX: CGFloat)?
+        let uuid: String?
+    }
+    private var screenGeometry: [ScreenGeometry] = []
+    private var screenObserver: NSObjectProtocol?
+
+    private func rebuildScreenGeometry() {
+        screenGeometry = NSScreen.screens.map { screen in
+            let bandHeight = screen.frame.maxY - screen.visibleFrame.maxY
+            let band = bandHeight > 0
+                ? NSRect(x: screen.frame.minX, y: screen.frame.maxY - bandHeight, width: screen.frame.width, height: bandHeight)
+                : .zero
+            var notch: (minX: CGFloat, maxX: CGFloat)?
+            if let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea {
+                notch = (left.maxX, right.minX)
+            }
+            return ScreenGeometry(screen: screen, frame: screen.frame, band: band, notch: notch, uuid: screen.displayUUIDString)
+        }
+    }
+
+    private func screenGeometry(containing point: NSPoint) -> ScreenGeometry? {
+        if screenGeometry.isEmpty { rebuildScreenGeometry() }
+        return screenGeometry.first { NSMouseInRect(point, $0.frame, false) }
+    }
+
+    /// `NSScreen` instances are stable between parameter changes, and the
+    /// cache rebuilds on each, so identity finds the entry.
+    private func geometry(of screen: NSScreen) -> ScreenGeometry? {
+        if let found = screenGeometry.first(where: { $0.screen === screen }) { return found }
+        rebuildScreenGeometry()
+        return screenGeometry.first { $0.screen === screen }
+    }
+
     init(appState: AppState) {
         self.appState = appState
     }
 
     func start() {
+        rebuildScreenGeometry()
+        screenObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.rebuildScreenGeometry() }
+        }
         // Passive global monitors: enough for hover + click detection, no
         // event swallowing (empty-area clicks fall through harmlessly).
         mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
@@ -144,9 +198,10 @@ final class MenuBarBandMonitor {
     private func pointerMoved() {
         guard let appState else { return }
         let location = NSEvent.mouseLocation
-        let screen = NSScreen.containing(location)
-        let inBand = screen.map { isBarHover(location, of: $0) } ?? false
-        let displayUUID = screen?.displayUUIDString
+        let geometry = screenGeometry(containing: location)
+        let screen = geometry?.screen
+        let inBand = geometry.map { isBarHover(location, of: $0) } ?? false
+        let displayUUID = geometry?.uuid
 
         // Per-display behavior: crossing onto an "always show all" display
         // reveals; crossing back to a "collapse" display arms the countdown.
@@ -298,9 +353,9 @@ final class MenuBarBandMonitor {
                 // latency, which is exactly a fast swipe-through. A
                 // graze must not open the bar.
                 let location = NSEvent.mouseLocation
-                guard let screen = NSScreen.containing(location),
-                      self.isBarHover(location, of: screen),
-                      self.isHoverZone(location, of: screen),
+                guard let geometry = self.screenGeometry(containing: location),
+                      self.isBarHover(location, of: geometry),
+                      self.isHoverZone(location, of: geometry.screen),
                       !appState.syntheticDragInFlight else { return }
                 appState.reveal([.hidden], reason: .hover)
             }
@@ -450,8 +505,9 @@ final class MenuBarBandMonitor {
     /// would not, and would also catch Control Center's host window across
     /// the top-right quadrant). Thin strips (Unclutter's 2pt trigger) and the
     /// menubar host window itself never exceed the band's height.
-    private func isBarHover(_ point: NSPoint, of screen: NSScreen) -> Bool {
-        guard isInMenuBarBand(point, of: screen) else { return false }
+    private func isBarHover(_ point: NSPoint, of geometry: ScreenGeometry) -> Bool {
+        guard isInMenuBarBand(point, of: geometry) else { return false }
+        let screen = geometry.screen
         let overlay = foreignOverlay(under: point, of: screen)
         if overlay != lastForeignOverlay {
             lastForeignOverlay = overlay
@@ -505,23 +561,13 @@ final class MenuBarBandMonitor {
     }
 
     private func isInMenuBarBand(_ point: NSPoint, of screen: NSScreen) -> Bool {
-        let bandHeight = screen.frame.maxY - screen.visibleFrame.maxY
-        guard bandHeight > 0 else { return false }
-        let band = NSRect(
-            x: screen.frame.minX,
-            y: screen.frame.maxY - bandHeight,
-            width: screen.frame.width,
-            height: bandHeight
-        )
-        guard NSMouseInRect(point, band, false) else { return false }
-        // The hardware cutout is never the bar: nothing draws there, so the
-        // window hit-test finds no overlay and read a pointer crossing it as
-        // a bar hover — on the way to Sconce's notch surface, the hidden
-        // icons came back (2026-09-12).
-        if let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea,
-           point.x > left.maxX, point.x < right.minX {
-            return false
-        }
+        guard let geometry = geometry(of: screen) else { return false }
+        return isInMenuBarBand(point, of: geometry)
+    }
+
+    private func isInMenuBarBand(_ point: NSPoint, of geometry: ScreenGeometry) -> Bool {
+        guard geometry.band.height > 0, NSMouseInRect(point, geometry.band, false) else { return false }
+        if let notch = geometry.notch, point.x > notch.minX, point.x < notch.maxX { return false }
         return true
     }
 
