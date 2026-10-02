@@ -48,6 +48,9 @@ final class PelmetStatusItem {
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             // Stable engine identity (chevron-boundary lookups key off this).
             button.setAccessibilityTitle("Pelmet.StatusItem")
+            // The one item of ours that is always drawn: the bar's ink is
+            // read off it for the apps whose icons we hide.
+            MenuBarInkBroadcast.shared.track(button)
         }
         warning = !appState.accessibilityGranted
         applyImage()
@@ -130,6 +133,7 @@ final class PelmetStatusItem {
     func remove() {
         removed = true
         removalObservation = nil
+        MenuBarInkBroadcast.shared.stop()
         NSStatusBar.system.removeStatusItem(item)
     }
 
