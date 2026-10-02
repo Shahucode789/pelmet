@@ -1885,7 +1885,7 @@ final class AppState {
     }
 
     /// When one of Pelmet's own items last came, left or changed face.
-    var ownBarChangedAt: Date { extras?.lastBarChange ?? .distantPast }
+    var ownBarSignature: String { extras?.barSignature ?? "" }
 
     /// Apple's SharePlay icon is on screen (a full reveal lets it back):
     /// the Camera & mic item steps aside for it as it does for the pill.

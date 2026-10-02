@@ -54,18 +54,26 @@ final class ExtrasManager {
     /// is skipped (2026-09-21). A button whose image is nil (fresh item)
     /// always draws.
     private var glyphKeys: [UUID: String] = [:]
-    /// When an own item last came, left, or changed face in the bar. The
-    /// blink cover's idle picture predates anything after it and would show
-    /// the bar as it was (Camera & mic's SharePlay face missing for 0.65s
-    /// under the click's cover, 60fps burst 2026-09-25).
-    private(set) var lastBarChange = Date.distantPast
+    /// The own items as the bar shows them: which are up, with which face.
+    /// The blink cover's idle picture is only true of a bar whose own items
+    /// read the same (Camera & mic's SharePlay face missing for 0.65s under
+    /// the click's cover, 60fps burst 2026-09-25). A timestamp of the last
+    /// change stood here: it moved on every show AND hide, so one hover
+    /// reveal (extras up, then down again, the bar exactly as pictured)
+    /// staled the picture for every clock click after it, each paying a
+    /// ~250ms capture (#74, 2026-10-02).
+    var barSignature: String {
+        lastVisible.filter(\.value).keys
+            .sorted { $0.uuidString < $1.uuidString }
+            .map { "\($0.uuidString):\(glyphKeys[$0] ?? "")" }
+            .joined(separator: "|")
+    }
 
     private func setGlyph(_ item: NSStatusItem, id: UUID, key: String, make: () -> NSImage?) {
         guard let button = item.button else { return }
         if glyphKeys[id] == key, button.image != nil { return }
         button.image = make()
         glyphKeys[id] = key
-        if lastVisible[id] == true { lastBarChange = Date() }
     }
     private var specs: [UUID: ExtraItemSpec] = [:]
     private var lastVisible: [UUID: Bool] = [:]
@@ -504,7 +512,6 @@ final class ExtrasManager {
         }
         guard lastVisible[id] != visible else { return }
         lastVisible[id] = visible
-        lastBarChange = Date()
         let wasPreattached = preattached.remove(id) != nil
         PelmetLog.log("extras: \(specs[id]?.itemTitle ?? "?") → \(visible ? (wasPreattached ? "fade (attached ahead)" : "show") : "hide (ghost)")")
         // Runs as the engine's reflow companion, so timing coincides with the
@@ -980,7 +987,6 @@ final class ExtrasManager {
         }
         item.button?.image = image
         glyphKeys[spec.id] = key
-        if lastVisible[spec.id] == true { lastBarChange = Date() }
     }
 
     // MARK: Actions

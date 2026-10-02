@@ -78,6 +78,9 @@ final class TransitionCoordinator {
     /// Notification Center's panel was under the bar when the idle picture
     /// was taken (its shade is in the pixels).
     private var revealCoverUnderPanel = false
+    /// Pelmet's own items as the idle picture shows them (`ownBarSignature`
+    /// at capture): the backdrop signature can't see them.
+    private var revealCoverOwnBar = ""
     /// The bar as it looks under Notification Center's open panel, over the
     /// blink cover's span: taken once after an entrance blink (the panel is
     /// open, the bar quiet), kept while the backdrop, wallpaper and active
@@ -599,10 +602,16 @@ final class TransitionCoordinator {
         if appState.currentRevealedSections.isEmpty {
             var whole = freshEmptyBarSnapshots(cropped: false)
             // The backdrop signature can't see Pelmet's own items, and this
-            // cover spans them: one that changed since shows the old bar.
-            if let taken = whole.first?.takenAt, taken < appState.ownBarChangedAt {
-                PelmetLog.log("\(label): idle picture predates an own item's change, capturing")
+            // cover spans them: a picture of other own items shows the old
+            // bar. Drop it, so the retake after the panel (or on the next
+            // approach) replaces it: kept, every click after paid a capture
+            // (five in a row, 2026-10-02).
+            if !whole.isEmpty, revealCoverOwnBar != appState.ownBarSignature {
+                PelmetLog.log("\(label): idle picture shows other own items, capturing")
                 whole = []
+                revealCoverSnapshot = []
+                revealCoverWanted = true
+                parkedCover = nil
             }
             // Right after the panel has left, the clock sits 3pt right of
             // rest for a moment; a picture that short at the clock end
@@ -971,7 +980,9 @@ final class TransitionCoordinator {
             let rect = precaptureRect
             revealCoverBackdrop = ConcealGhostOverlay.backdropSignature(of: rect) + ConcealGhostOverlay.surfaceSignature()
             let underPanel = ClockClickRelay.notificationCenterIsOpen()
+            let ownBar = appState.ownBarSignature
             revealCoverSnapshot = await ConcealGhostOverlay.snapshotSet(of: rect)
+            revealCoverOwnBar = ownBar
             revealCoverUnderPanel = underPanel
             revealCoverWanted = false
             parkedCover = nil
