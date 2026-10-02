@@ -205,6 +205,25 @@ nonisolated final class ClockClickRelay: @unchecked Sendable {
         return CGPoint(x: clockMaxX - width / 2, y: bounds.minY + bandHeight / 2)
     }
 
+    /// The clock under `point` by the tap's own geometry: where a replayed
+    /// click can land without moving the pointer. A posted click drags the
+    /// cursor to its own location, so a replay at where the click LANDED
+    /// yanked a hand that had moved on back to that spot ~250ms later, and
+    /// one at the clock's centre pulled it there and back (#74). The live
+    /// pointer is the replay point whenever it is still on the clock.
+    /// Opening needs the clock itself (a click in the dot zone past it is
+    /// the dot's); closing takes the whole zone, the panel dismisses on any
+    /// click outside it and the dot's popover never shows for that one
+    /// (probed 2026-10-02: tagged click on the lit indicator, panel gone,
+    /// no popover).
+    func isOnClock(_ point: CGPoint, dotZoneIncluded: Bool) -> Bool {
+        lock.withLock {
+            guard isOnClock(point) else { return false }
+            guard !dotZoneIncluded, let insetFromRight, let display = Self.display(under: point) else { return true }
+            return point.x < CGDisplayBounds(display).maxX - insetFromRight
+        }
+    }
+
     static func display(under point: CGPoint) -> CGDirectDisplayID? {
         var display: CGDirectDisplayID = 0
         var count: UInt32 = 0

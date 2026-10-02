@@ -825,11 +825,24 @@ final class AppState {
 
     private func clockClicked(at point: CGPoint, pointer: CGPoint, viaShortcut: Bool = false) {
         Task { @MainActor in
-            // Dot zone (target ≠ where the click landed): press the clock
-            // through AX so the pointer never moves; the click is the
-            // fallback. The element is resolved now, on a static bar.
-            let clockElement = point == pointer ? nil : ClockClickRelay.clockElement(at: point)
+            // Press the clock through AX so the pointer never moves; the
+            // click is the fallback. Dot-zone clicks pressed since
+            // 2026-09-19, clicks on the clock itself replayed at the spot
+            // they landed, which dragged a hand that had moved on back to
+            // it (#74). The element is resolved now, on a static bar.
+            let clockElement = ClockClickRelay.clockElement(at: point)
             let panelWasOpen = ClockClickRelay.notificationCenterIsOpen() || Date().timeIntervalSince(panelOpenedAt) < 1
+            // Where a replayed click lands: under the pointer while it is
+            // still on the clock (no drag, nothing to put back), else the
+            // target, with the pointer put back after. A close may land in
+            // the dot zone too, an open needs the clock itself.
+            let replayClick = { [clockRelay] (closing: Bool) in
+                if let live = CGEvent(source: nil)?.location, clockRelay?.isOnClock(live, dotZoneIncluded: closing) == true {
+                    ClockClickRelay.postClick(at: live, pointer: live)
+                } else {
+                    ClockClickRelay.postClick(at: point, pointer: pointer)
+                }
+            }
             // Closing needs no blink: the panel dismisses itself on a click
             // outside it, and the assertion only refuses the clock's OWN
             // action. A plain replay of the click, no cover, no picture,
@@ -838,7 +851,7 @@ final class AppState {
             // assertion held the clock's click is refused (probed 0/2).
             if panelWasOpen {
                 await ClockClickRelay.waitForButtonRelease()
-                ClockClickRelay.postClick(at: point, pointer: pointer)
+                replayClick(true)
                 panelOpenedAt = .distantPast
                 PelmetLog.log("clock: panel open — click replayed, no blink")
                 // The bare bar is back once the panel has left (and its
@@ -889,7 +902,7 @@ final class AppState {
                         try? await Task.sleep(for: .milliseconds(30))
                         opened = ClockClickRelay.notificationCenterIsOpen()
                     } while !opened && Date() < verifyUntil
-                    PelmetLog.log("clock: dot press \(attempt) \(pressed ? "sent" : "refused") - NC \(opened ? "open" : "not open")")
+                    PelmetLog.log("clock: press \(attempt) \(pressed ? "sent" : "refused") - NC \(opened ? "open" : "not open")")
                 }
                 if !opened {
                     // A key never moves the pointer: the shortcut stops at
@@ -897,12 +910,12 @@ final class AppState {
                     if viaShortcut {
                         PelmetLog.log("clock: shortcut — panel not seen after 2 presses, no click replayed")
                     } else {
-                        ClockClickRelay.postClick(at: point, pointer: pointer); panelStarting()
+                        replayClick(false); panelStarting()
                     }
                 }
             } else {
-                if point != pointer { PelmetLog.log("clock: dot click - no clock element under the target, replaying the click") }
-                ClockClickRelay.postClick(at: point, pointer: pointer)
+                PelmetLog.log("clock: no clock element under the target, replaying the click")
+                replayClick(false)
                 panelStarting()
             }
             guard blinked else { cover?.dismiss(); return }
