@@ -331,6 +331,7 @@ final class TransitionCoordinator {
                     }
                 }
                 if let picture {
+                    Self.dumpPictures(picture, label: "entrance", keep: revealedStripKeep ?? entranceKeep, punch: chevronPunch(clearingFrom: lastConcealedStripRect?.maxX))
                     let startsHidden: Bool = { if case .pop = recipe.entrance { return false } else { return true } }()
                     finished = ConcealGhostOverlay.begin(
                         from: picture, safety: AppTiming.transitionCoverSafety, startHidden: startsHidden
@@ -761,6 +762,25 @@ final class TransitionCoordinator {
         let snaps = ConcealGhostOverlay.clearing(emptyBar, columns: columns)
         punchedCoverCache = (key, snaps)
         return snaps
+    }
+
+    /// Debug: `defaults write app.fif7y.Pelmet pelmet.debug.dumpPictures -bool YES`
+    /// writes every entrance picture to ~/Library/Logs/Pelmet/pictures/ with
+    /// its span, keep and punch in the log, so what slides can be compared
+    /// with what the bar shows (2026-10-02: Sound missing from the slide on
+    /// the external display).
+    private static func dumpPictures(_ picture: [ConcealGhostOverlay.BarSnapshot], label: String, keep: ClosedRange<CGFloat>?, punch: [ClosedRange<CGFloat>]) {
+        guard UserDefaults.standard.bool(forKey: "pelmet.debug.dumpPictures") else { return }
+        let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Pelmet/pictures")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let stamp = Int(Date().timeIntervalSince1970 * 1000)
+        let spans = picture.map { "\(Int($0.windowFrame.minX))..\(Int($0.windowFrame.maxX))" }.joined(separator: " ")
+        PelmetLog.log("picture: \(label) \(picture.count) snap(s) [\(spans)] keep \(keep.map { "\(Int($0.lowerBound))..\(Int($0.upperBound))" } ?? "none") punch \(punch.map { "\(Int($0.lowerBound))..\(Int($0.upperBound))" }.joined(separator: ","))")
+        for snap in picture {
+            let url = dir.appendingPathComponent("\(stamp)_\(label)_x\(Int(snap.windowFrame.minX)).png")
+            let rep = NSBitmapImageRep(cgImage: snap.image)
+            try? rep.representation(using: .png, properties: [:])?.write(to: url)
+        }
     }
 
     private func cutOutPicture(
