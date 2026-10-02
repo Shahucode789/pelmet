@@ -194,6 +194,8 @@ final class TransitionCoordinator {
     /// reveal path floats it synchronously instead of paying ~100ms+ of SCK
     /// capture before the swap can even start (snappiness).
     private var revealCoverSnapshot: [ConcealGhostOverlay.BarSnapshot] = []
+    /// The primary-band rect the idle picture was captured with.
+    private var revealCoverTakenRect: CGRect?
     /// The active display (see `AppState.lastMouseDownDisplay`) when each
     /// picture was taken. macOS dims the bar on every other display, so a
     /// picture is only true while the same display stays active: a click
@@ -260,6 +262,21 @@ final class TransitionCoordinator {
         lastConcealedStripRect = strip
         guard let strip else { return }
         widestStripMinX = min(widestStripMinX ?? strip.minX, strip.minX)
+        // The idle picture spans the rect it was taken with. A strip wider
+        // than that rect (the boot seed missed Sound; the first conceal
+        // measured it) leaves live icons past the picture's edge: Sound
+        // popped in after the slide on the external, and a quick hover
+        // on/off showed the icons twice, one set standing still while the
+        // strip slid out (Gab, 2026-10-02). Drop it, the idle retake
+        // spans the new strip.
+        if let taken = revealCoverTakenRect, let want = precaptureRect,
+           want.minX < taken.minX - 1 || want.maxX > taken.maxX + 1 {
+            PelmetLog.log("cover: idle picture \(Int(taken.minX))..\(Int(taken.maxX)) is short of the strip \(Int(want.minX))..\(Int(want.maxX)), retaking")
+            revealCoverSnapshot = []
+            revealCoverTakenRect = nil
+            revealCoverWanted = true
+            parkedCover = nil
+        }
     }
 
     func performReveal(_ sections: Set<PelmetCore.Section>, trace: PerfTrace) {
@@ -1002,6 +1019,7 @@ final class TransitionCoordinator {
             let underPanel = ClockClickRelay.notificationCenterIsOpen()
             let ownBar = appState.ownBarSignature
             revealCoverSnapshot = await ConcealGhostOverlay.snapshotSet(of: rect)
+            revealCoverTakenRect = rect
             revealCoverOwnBar = ownBar
             revealCoverUnderPanel = underPanel
             revealCoverWanted = false
