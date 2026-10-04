@@ -307,6 +307,27 @@ nonisolated final class ClockClickRelay: @unchecked Sendable {
         AXUIElementPerformAction(element, kAXPressAction as CFString) == .success
     }
 
+    /// The macOS build on which the clock's press never brought the panel
+    /// up: a click whose press went out and waited with the assertion down,
+    /// and no panel by the end of it. Only later builds wire the press to
+    /// Notification Center — on the 2026-09-03 beta it was dead even with no
+    /// assertion held, and on 27.0.1 every click turned press lost the
+    /// panel (#74). Such a Mac replays the click instead, the path every
+    /// direct click took before 0.3.1-beta.4. Kept per build, so an update
+    /// tries the press again.
+    private static let pressDeadKey = "pelmet.clockPressDeadOnBuild"
+    private static var osBuild: String { ProcessInfo.processInfo.operatingSystemVersionString }
+
+    @MainActor static var pressNeverOpensPanel: Bool {
+        UserDefaults.standard.string(forKey: pressDeadKey) == osBuild
+    }
+
+    @MainActor static func notePressNeverOpensPanel() {
+        guard !pressNeverOpensPanel else { return }
+        UserDefaults.standard.set(osBuild, forKey: pressDeadKey)
+        PelmetLog.log("clock: the press never opened the panel on \(osBuild) — clicks are replayed from now on")
+    }
+
     /// A real HID-source click with click state set — the agent ignores
     /// anything less (verified: a bare CGEvent click never opens NC).
     /// `pointer` is where the physical click landed: a posted mouse event
