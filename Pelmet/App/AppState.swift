@@ -44,6 +44,13 @@ final class AppState {
     private(set) var settingsHotkeyConflict = false
     private(set) var alwaysHiddenHotkeyConflict = false
     private(set) var notificationCenterHotkeyConflict = false
+    private(set) var searchHotkeyConflict = false
+    /// One-shot: the setting row (`SettingsIndex` id) Settings should scroll
+    /// to and mark. Set by `openSettings(tab:row:)`, cleared by the view.
+    var settingsFocusRow: String?
+    /// Bumped when the command bar saves or resets its history, so the
+    /// Settings row that offers the reset knows whether there is any.
+    var searchHistoryRevision = 0
 
     var settingsWindowVisible = false {
         didSet {
@@ -62,7 +69,11 @@ final class AppState {
         settings.behavior(forDisplayUUID: NSScreen.underPointer?.displayUUIDString)
     }
 
-    @ObservationIgnored private lazy var transitions = TransitionCoordinator(appState: self, engine: engine)
+    @ObservationIgnored lazy var transitions = TransitionCoordinator(appState: self, engine: engine)
+    /// Opens an item's menu in place, hidden or not (see ItemPress).
+    @ObservationIgnored private lazy var press = ItemPress(appState: self)
+    /// The keyboard way into the bar (see CommandBarController).
+    @ObservationIgnored lazy var commandBar = CommandBarController(appState: self)
     private var rehide = RehideStateMachine()
     private var rehideTimer: Timer?
     /// One "rehide: deferred" line per armed countdown, not one per re-arm.
@@ -105,6 +116,7 @@ final class AppState {
         startMonitors()
         startEngineEventPump()
         bootEngine()
+        observeDebugOpenMenu()
     }
 
     private func wireTransitionSettleCallbacks() {
@@ -274,17 +286,25 @@ final class AppState {
             case .settings: self?.openSettings()
             case .notificationCenter: self?.openNotificationCenter()
             case .alwaysHidden: self?.toggleAll(reason: .hotkey)
+            case .search: self?.commandBar.toggle(source: "hotkey")
             }
         }
         hotkeyConflict = !hotkey.register(settings.hotkey, slot: .toggle)
         settingsHotkeyConflict = !hotkey.register(settings.settingsHotkey, slot: .settings)
         alwaysHiddenHotkeyConflict = !hotkey.register(settings.alwaysHiddenHotkey, slot: .alwaysHidden)
         notificationCenterHotkeyConflict = !hotkey.register(activeNotificationCenterHotkey, slot: .notificationCenter)
+        searchHotkeyConflict = !hotkey.register(settings.searchHotkey, slot: .search)
         registeredHotkey = settings.hotkey
         registeredSettingsHotkey = settings.settingsHotkey
         registeredAlwaysHiddenHotkey = settings.alwaysHiddenHotkey
         registeredNotificationCenterHotkey = activeNotificationCenterHotkey
+        registeredSearchHotkey = settings.searchHotkey
         self.hotkey = hotkey
+        hotkey.onItemTrigger = { [weak self] slot in self?.itemHotkeyFired(slot) }
+        syncItemHotkeys()
+        // The command bar's panel is built once things have settled, not on
+        // the first shortcut.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.commandBar.warm() }
 
         // A relaunched app's status item is a FRESH registration made under
         // the assertion — it parks offscreen until an adoption window lets
@@ -650,6 +670,171 @@ final class AppState {
     /// could see the bar open (see `toggle`).
     private var hoverRevealStartedAt: Date?
 
+    /// Open an item's menu where it sits, whichever section it is in: on
+    /// the bar it is clicked, concealed it is brought back alone beneath a
+    /// cover for the click and put away once its menu is gone (ItemPress).
+    /// `.secondary` is the right click. The clock opens Notification Center
+    /// the way its shortcut does: a click on it is refused while the
+    /// assertion is held.
+    func openItemMenu(_ id: ItemID, button: ItemPress.Button = .primary) {
+        if button == .primary, id.rawValue.hasSuffix("::com.apple.menuextra.clock") {
+            openNotificationCenter()
+            return
+        }
+        press.open(id, button: button)
+    }
+
+    /// Show an item in the bar without clicking it: its section opens the
+    /// way the hotkey opens it (Always Hidden with Hidden, as the Always
+    /// Hidden shortcut does), and the rehide machine takes it from there.
+    func showItemInBar(_ id: ItemID) {
+        let key = id.sectionKey
+        let section = settings.sectionModel.section(of: key)
+        guard section != .visible else {
+            PelmetLog.log("press: show \(key.rawValue) — already in the visible section")
+            return
+        }
+        let wanted: Set<PelmetCore.Section> = section == .alwaysHidden ? [.hidden, .alwaysHidden] : [.hidden]
+        guard !wanted.isSubset(of: currentRevealedSections) else {
+            PelmetLog.log("press: show \(key.rawValue) — its section is already revealed")
+            return
+        }
+        PelmetLog.log("press: show \(key.rawValue) — revealing \(wanted.map(\.rawValue).sorted())")
+        reveal(wanted.union(currentRevealedSections), reason: .hotkey)
+    }
+
+    // MARK: - Per-item shortcuts
+
+    /// Why a combination cannot become an item's shortcut.
+    enum ItemHotkeyRefusal: Equatable {
+        /// Already one of Pelmet's own shortcuts; carries what it does.
+        case pelmet(String)
+        /// Already another item's shortcut.
+        case item(ItemID)
+        /// macOS holds it (System Settings › Keyboard Shortcuts).
+        case system
+        /// Another app registered it first.
+        case otherApp
+    }
+
+    /// Each item's shortcut opens its menu like a pick in the command bar.
+    /// Slots count up from `HotkeyManager.itemSlotBase`; a combination another
+    /// app holds is kept with no slot, so it is not retried on every settings
+    /// change.
+    private var itemHotkeyState: [String: (spec: HotkeySpec, slot: UInt32?)] = [:]
+    private var nextItemHotkeySlot = HotkeyManager.itemSlotBase
+
+    /// Brings the registrations in line with `settings.itemHotkeys`; cheap
+    /// when nothing changed.
+    func syncItemHotkeys() {
+        guard let hotkey else { return }
+        let wanted = settings.itemHotkeys
+        for (key, state) in itemHotkeyState where wanted[key] != state.spec {
+            if let slot = state.slot { hotkey.unregisterItem(slot: slot) }
+            itemHotkeyState.removeValue(forKey: key)
+        }
+        for (key, spec) in wanted where itemHotkeyState[key] == nil {
+            let slot = nextItemHotkeySlot
+            let registered = hotkey.registerItem(spec, slot: slot)
+            if registered { nextItemHotkeySlot += 1 }
+            itemHotkeyState[key] = (spec, registered ? slot : nil)
+        }
+    }
+
+    private func itemHotkeyFired(_ slot: UInt32) {
+        guard let key = itemHotkeyState.first(where: { $0.value.slot == slot })?.key else { return }
+        PelmetLog.log("hotkey: item shortcut → \(key)")
+        openItemMenu(ItemID(rawValue: key))
+    }
+
+    /// Sets (or, with nil, removes) an item's shortcut. Nil back when it
+    /// took; otherwise why not, with nothing changed.
+    @discardableResult
+    func setItemHotkey(_ spec: HotkeySpec?, for id: ItemID) -> ItemHotkeyRefusal? {
+        let key = id.sectionKey.rawValue
+        let previous = settings.itemHotkeys[key]
+        if let spec {
+            if let refusal = itemHotkeyRefusal(spec, for: key) { return refusal }
+            settings.itemHotkeys[key] = spec
+        } else {
+            settings.itemHotkeys.removeValue(forKey: key)
+        }
+        syncItemHotkeys()
+        if spec != nil, itemHotkeyState[key]?.slot == nil {
+            // RegisterEventHotKey said no: another app holds it.
+            settings.itemHotkeys[key] = previous
+            syncItemHotkeys()
+            return .otherApp
+        }
+        settings.save()
+        PelmetLog.log("hotkey: item \(key) shortcut \(spec?.display ?? "removed")")
+        return nil
+    }
+
+    private func itemHotkeyRefusal(_ spec: HotkeySpec, for key: String) -> ItemHotkeyRefusal? {
+        func same(_ other: HotkeySpec?) -> Bool {
+            other.map { $0.keyCode == spec.keyCode && $0.modifiers == spec.modifiers } ?? false
+        }
+        if same(settings.hotkey) { return .pelmet(String(localized: "Show Hidden Items")) }
+        if same(settings.alwaysHiddenHotkey) { return .pelmet(String(localized: "Show Always-Hidden Too")) }
+        if same(settings.searchHotkey) { return .pelmet(String(localized: "Search the menu bar")) }
+        if same(settings.settingsHotkey) { return .pelmet(String(localized: "Open Settings")) }
+        if same(activeNotificationCenterHotkey) { return .pelmet(String(localized: "Open Notification Center")) }
+        if let other = settings.itemHotkeys.first(where: { $0.key != key && same($0.value) })?.key {
+            return .item(ItemID(rawValue: other))
+        }
+        return SystemShortcuts.owns(spec) ? .system : nil
+    }
+
+    /// The user's own name for an item; empty clears it.
+    func setItemAlias(_ alias: String, for id: ItemID) {
+        let key = id.sectionKey.rawValue
+        let trimmed = alias.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            settings.itemAliases.removeValue(forKey: key)
+        } else {
+            settings.itemAliases[key] = String(trimmed.prefix(40))
+        }
+        settings.save()
+        PelmetLog.log("search: alias for \(key) \(trimmed.isEmpty ? "removed" : "set")")
+    }
+
+    /// Debug: `defaults write app.fif7y.Pelmet pelmet.debug.openMenu -bool YES`,
+    /// then relaunch. The distributed notification `app.fif7y.Pelmet.debug.openMenu`
+    /// opens the menu of the item its object names (a section key or a bundle
+    /// id; userInfo `button` = "secondary" for the right click), for testing
+    /// the press without any UI. Not observed unless the flag is set.
+    private func observeDebugOpenMenu() {
+        guard UserDefaults.standard.bool(forKey: "pelmet.debug.openMenu") else { return }
+        debugOpenMenuObserver = DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("app.fif7y.Pelmet.debug.openMenu"), object: nil, queue: .main
+        ) { [weak self] note in
+            let name = note.object as? String
+            let secondary = note.userInfo?["button"] as? String == "secondary"
+            MainActor.assumeIsolated { self?.debugOpenMenu(matching: name, secondary: secondary) }
+        }
+        PelmetLog.log("press: debug trigger on — app.fif7y.Pelmet.debug.openMenu")
+    }
+
+    @ObservationIgnored private var debugOpenMenuObserver: NSObjectProtocol?
+
+    private func debugOpenMenu(matching name: String?, secondary: Bool) {
+        guard let name, !name.isEmpty else {
+            PelmetLog.log("press: debug — no item named in the notification's object")
+            return
+        }
+        var ids = Set(settings.sectionModel.assignments.keys)
+        for item in snapshot?.items ?? [] { ids.insert(item.id.sectionKey) }
+        for id in snapshot?.concealed ?? [] { ids.insert(id.sectionKey) }
+        let matches = ids.filter { $0.rawValue == name || $0.bundleID == name }.sorted { $0.rawValue < $1.rawValue }
+        guard let id = matches.first else {
+            PelmetLog.log("press: debug — no item matches \(name)")
+            return
+        }
+        if matches.count > 1 { PelmetLog.log("press: debug — \(matches.count) items match \(name), taking \(id.rawValue)") }
+        openItemMenu(id, button: secondary ? .secondary : .primary)
+    }
+
     func concealNow() {
         PelmetLog.log("concealNow state=\(rehide.state)")
         dispatch(rehide.handle(.concealRequested))
@@ -730,7 +915,10 @@ final class AppState {
         separators?.apply(model: settings.sectionModel, revealed: currentRevealedSections)
     }
 
-    func openSettings(tab: SettingsTab = .general) {
+    /// `row` is a setting the window should scroll to and mark once (the
+    /// command bar's jump); the Settings view takes it and clears it.
+    func openSettings(tab: SettingsTab = .general, row: String? = nil) {
+        settingsFocusRow = row
         SettingsWindowController.shared.show(appState: self, tab: tab)
     }
 
@@ -767,6 +955,7 @@ final class AppState {
     private var registeredSettingsHotkey: HotkeySpec?
     private var registeredAlwaysHiddenHotkey: HotkeySpec?
     private var registeredNotificationCenterHotkey: HotkeySpec?
+    private var registeredSearchHotkey: HotkeySpec?
     /// The shortcut rides on the clock relay: off with it, not on its own.
     private var activeNotificationCenterHotkey: HotkeySpec? {
         settings.clockClickOpensNotificationCenter ? settings.notificationCenterHotkey : nil
@@ -1144,6 +1333,11 @@ final class AppState {
             notificationCenterHotkeyConflict = !(hotkey?.register(activeNotificationCenterHotkey, slot: .notificationCenter) ?? true)
             registeredNotificationCenterHotkey = activeNotificationCenterHotkey
         }
+        if settings.searchHotkey != registeredSearchHotkey {
+            searchHotkeyConflict = !(hotkey?.register(settings.searchHotkey, slot: .search) ?? true)
+            registeredSearchHotkey = settings.searchHotkey
+        }
+        syncItemHotkeys()
         // Newly created separators and toggled-on extras get hosted wherever
         // macOS pleases (the order hint when it is fresh, the hidden side
         // when not): through the Apply door like any own item entering the

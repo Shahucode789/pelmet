@@ -4,6 +4,7 @@
 // right-click or imperative button control.
 
 import AppKit
+import Carbon.HIToolbox
 import PelmetCore
 import PelmetEngine
 
@@ -172,6 +173,11 @@ final class PelmetStatusItem {
             title: String(localized: "Show Always-Hidden Too"),
             action: #selector(AppMenuTarget.showAll), keyEquivalent: ""
         )
+        let search = NSMenuItem(
+            title: String(localized: "Search…"),
+            action: #selector(AppMenuTarget.search), keyEquivalent: ""
+        )
+        Self.showShortcut(appState.settings.searchHotkey, on: search)
         let settings = NSMenuItem(
             title: String(localized: "Pelmet Settings…"),
             // No key equivalent: it only fires while this menu is open, and read
@@ -200,7 +206,7 @@ final class PelmetStatusItem {
             styles.addItem(option)
         }
         animation.submenu = styles
-        var items: [NSMenuItem] = [toggle, showAll, .separator(), animation, settings, .separator(), quit]
+        var items: [NSMenuItem] = [toggle, showAll, .separator(), animation, search, settings, .separator(), quit]
         // Same line in every right-click (chevron, separators, empty bar),
         // right under Settings: the About chip is the only other trace once
         // the banner is gone.
@@ -229,6 +235,24 @@ final class PelmetStatusItem {
         menu.items = items
         return menu
     }
+
+    /// Draw a global shortcut beside its menu item. It is a real one (the
+    /// same combination works with this menu closed), so unlike Settings it
+    /// reads true. Only a single-character key can be drawn as a key
+    /// equivalent; the arrows and F-keys are left off.
+    private static func showShortcut(_ spec: HotkeySpec?, on item: NSMenuItem) {
+        guard let spec else { return }
+        let modifierGlyphs: Set<Character> = ["⌃", "⌥", "⇧", "⌘"]
+        let keys = spec.display.filter { !modifierGlyphs.contains($0) }
+        guard keys.count == 1 else { return }
+        var mask: NSEvent.ModifierFlags = []
+        if spec.modifiers & UInt32(controlKey) != 0 { mask.insert(.control) }
+        if spec.modifiers & UInt32(optionKey) != 0 { mask.insert(.option) }
+        if spec.modifiers & UInt32(shiftKey) != 0 { mask.insert(.shift) }
+        if spec.modifiers & UInt32(cmdKey) != 0 { mask.insert(.command) }
+        item.keyEquivalent = keys.lowercased()
+        item.keyEquivalentModifierMask = mask
+    }
 }
 
 /// Shared menu target so context menus built from separators and the status
@@ -239,6 +263,7 @@ final class AppMenuTarget: NSObject {
 
     @objc func toggle() { appState?.toggle(reason: .statusItem) }
     @objc func showAll() { appState?.reveal([.hidden, .alwaysHidden], reason: .statusItem) }
+    @objc func search() { appState?.commandBar.open(source: "menu") }
     @objc func openSettings() { appState?.openSettings() }
     @objc func setAnimation(_ sender: NSMenuItem) {
         guard let appState,

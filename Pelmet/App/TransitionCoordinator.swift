@@ -143,10 +143,34 @@ final class TransitionCoordinator {
     /// hover delay or a click. Retake the dropped cover now so it is ready
     /// (~90ms on Gab's Mac, 150–466ms on #49's), and only now.
     func pointerApproachedBar() {
-        guard revealCoverWanted, !precaptureInFlight, revealCoverSnapshot.isEmpty,
+        guard revealCoverWanted, !precaptureInFlight, revealCoverSnapshot.isEmpty, !pressHoldsBar,
               appState?.currentRevealedSections.isEmpty == true else { return }
         PelmetLog.log("cover: retaking on approach")
         scheduleRevealCoverPrecapture(afterConceal: false)
+    }
+
+    /// An item press (ItemPress) has an icon revealed on its own, or the «
+    /// expanded, while the rehide machine still reads "concealed": the bar is
+    /// not the empty bar the idle picture is of. A picture taken meanwhile
+    /// would hold the icon (a ghost in every reveal and clock cover until
+    /// the next retake, up to 15 minutes), so no idle picture is taken while
+    /// a press holds the bar, and one in flight across a press is dropped.
+    private var pressHolds = 0
+    private var pressEpoch = 0
+    private var pressHoldsBar: Bool { pressHolds > 0 }
+
+    func pressBegan() {
+        pressHolds += 1
+        pressEpoch += 1
+    }
+
+    /// The bar is back as it was: take the idle picture a press kept from
+    /// being taken.
+    func pressEnded() {
+        pressHolds = max(0, pressHolds - 1)
+        pressEpoch += 1
+        guard pressHolds == 0, revealCoverSnapshot.isEmpty else { return }
+        scheduleRevealCoverPrecapture()
     }
 
     /// A reveal with the cover still wanted: start the capture if nothing
@@ -721,8 +745,11 @@ final class TransitionCoordinator {
     /// fading out when a hold-only lift came (Gab, 2026-09-14: "all apps at
     /// the very end"). Poll a fresh AX walk until the concealed items have
     /// left the tree, then hold for the agent's fade.
-    func endBarCover(_ cover: BlinkCover, label: String = "clock") {
+    /// `then` runs once the cover is down (an item press ends its hold on
+    /// the idle picture there).
+    func endBarCover(_ cover: BlinkCover, label: String = "clock", then: (@MainActor () -> Void)? = nil) {
         Task { @MainActor in
+            defer { then?() }
             guard let appState else { cover.dismiss(); return }
             let started = Date()
             await appState.waitUntilQuiesced(interval: 0.15, deadline: 2, poll: .milliseconds(30))
@@ -1005,6 +1032,10 @@ final class TransitionCoordinator {
             // The agent's own conceal fade must not bake into the snapshot.
             if afterConceal { try? await Task.sleep(for: AppTiming.precaptureGhostClearance) }
             guard !Task.isCancelled, appState.currentRevealedSections.isEmpty else { return }
+            guard !pressHoldsBar else {
+                PelmetLog.log("cover: item press holds the bar, precapture skipped")
+                return
+            }
             // Under Notification Center's panel the bar is not the bar a
             // reveal or a clock click will find: leave the bare picture
             // (or its absence) alone, the blink keeps its own picture of
@@ -1018,7 +1049,16 @@ final class TransitionCoordinator {
             revealCoverBackdrop = ConcealGhostOverlay.backdropSignature(of: rect) + ConcealGhostOverlay.surfaceSignature()
             let underPanel = ClockClickRelay.notificationCenterIsOpen()
             let ownBar = appState.ownBarSignature
-            revealCoverSnapshot = await ConcealGhostOverlay.snapshotSet(of: rect)
+            let epoch = pressEpoch
+            let taken = await ConcealGhostOverlay.snapshotSet(of: rect)
+            guard epoch == pressEpoch, !pressHoldsBar else {
+                PelmetLog.log("cover: idle picture dropped, an item press had the bar while it was taken")
+                revealCoverSnapshot = []
+                revealCoverTakenRect = nil
+                revealCoverWanted = true
+                return
+            }
+            revealCoverSnapshot = taken
             revealCoverTakenRect = rect
             revealCoverOwnBar = ownBar
             revealCoverUnderPanel = underPanel

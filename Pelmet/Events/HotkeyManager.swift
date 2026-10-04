@@ -8,9 +8,16 @@ import PelmetCore
 import PelmetEngine
 
 final class HotkeyManager {
-    enum Slot: UInt32 { case toggle = 1, settings = 2, notificationCenter = 3, alwaysHidden = 4 }
+    enum Slot: UInt32 { case toggle = 1, settings = 2, notificationCenter = 3, alwaysHidden = 4, search = 5 }
+
+    /// Per-item shortcuts (open that item's menu) take raw ids from here
+    /// up. The owner hands them out, so a slot outlives nothing it does not
+    /// know about.
+    static let itemSlotBase: UInt32 = 100
 
     private var hotKeyRefs: [Slot: EventHotKeyRef] = [:]
+    private var itemRefs: [UInt32: EventHotKeyRef] = [:]
+    var onItemTrigger: ((UInt32) -> Void)?
     private var handlerRef: EventHandlerRef?
     private let onTrigger: (Slot) -> Void
 
@@ -47,6 +54,30 @@ final class HotkeyManager {
         return true
     }
 
+    /// False when the combo is held elsewhere, as for `register`.
+    @discardableResult
+    func registerItem(_ spec: HotkeySpec, slot: UInt32) -> Bool {
+        unregisterItem(slot: slot)
+        installHandlerIfNeeded()
+        var ref: EventHotKeyRef?
+        let hotKeyID = EventHotKeyID(signature: OSType(0x4E4F4F4B), id: slot)
+        let status = RegisterEventHotKey(
+            spec.keyCode, spec.modifiers, hotKeyID, GetApplicationEventTarget(), 0, &ref
+        )
+        if status != noErr {
+            PelmetLog.log("hotkey: \(spec.display) (item slot \(slot)) not registered (status \(status)) — held by another app?")
+            return false
+        }
+        itemRefs[slot] = ref
+        return true
+    }
+
+    func unregisterItem(slot: UInt32) {
+        if let ref = itemRefs.removeValue(forKey: slot) {
+            UnregisterEventHotKey(ref)
+        }
+    }
+
     private func installHandlerIfNeeded() {
         guard handlerRef == nil else { return }
         var eventType = EventTypeSpec(
@@ -63,9 +94,13 @@ final class HotkeyManager {
                     event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
                     nil, MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID
                 )
-                guard let slot = Slot(rawValue: hotKeyID.id) else { return noErr }
                 let manager = Unmanaged<HotkeyManager>.fromOpaque(userData).takeUnretainedValue()
-                DispatchQueue.main.async { manager.onTrigger(slot) }
+                let id = hotKeyID.id
+                if let slot = Slot(rawValue: id) {
+                    DispatchQueue.main.async { manager.onTrigger(slot) }
+                } else if id >= HotkeyManager.itemSlotBase {
+                    DispatchQueue.main.async { manager.onItemTrigger?(id) }
+                }
                 return noErr
             },
             1,

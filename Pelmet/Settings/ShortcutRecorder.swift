@@ -140,7 +140,7 @@ struct ShortcutRecorder: View {
         return mods
     }
 
-    private static func symbols(_ flags: NSEvent.ModifierFlags) -> String {
+    static func symbols(_ flags: NSEvent.ModifierFlags) -> String {
         var out = ""
         if flags.contains(.control) { out += "⌃" }
         if flags.contains(.option) { out += "⌥" }

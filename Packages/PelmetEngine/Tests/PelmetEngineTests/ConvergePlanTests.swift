@@ -96,6 +96,41 @@ import PelmetCore
         #expect(plan.allowedBundles.contains("com.example.otterkeep"))
     }
 
+    @Test func revealedItemLeavesTheConcealableSetAlone() {
+        // A press brings one icon back: its bundle comes off the concealable
+        // set, its section stays concealed, the neighbour stays hidden.
+        let plan = ConvergePlan.compute(
+            model: model([velja: .alwaysHidden, otterkeep: .hidden]),
+            liveIDs: [velja, otterkeep],
+            carriedConcealed: [],
+            runningBundles: ["com.sindresorhus.Velja", "com.example.otterkeep"],
+            revealedSections: [],
+            revealedItems: [otterkeep],
+            steadyExtras: true,
+            exemptBundles: exempt
+        )
+        #expect(plan.concealable == ["com.sindresorhus.Velja"])
+        #expect(plan.concealed == [velja])
+        #expect(plan.allowedBundles.contains("com.example.otterkeep"))
+        #expect(!plan.allowedBundles.contains("com.sindresorhus.Velja"))
+    }
+
+    @Test func revealedSystemItemLeavesTheHiddenSet() {
+        let plan = ConvergePlan.compute(
+            model: model([sound: .hidden]),
+            liveIDs: [sound],
+            carriedConcealed: [],
+            runningBundles: [],
+            revealedSections: [],
+            revealedItems: [sound],
+            steadyExtras: true,
+            exemptBundles: exempt
+        )
+        #expect(plan.hiddenSystem.isEmpty)
+        #expect(plan.allowedSystem.contains(.volume))
+        #expect(plan.concealed.isEmpty)
+    }
+
     @Test func concealedCarriedItemStaysConcealableWhileUnobservable() {
         // The oscillation case: item concealed → unobservable. The carried
         // set must keep it in the concealable computation.

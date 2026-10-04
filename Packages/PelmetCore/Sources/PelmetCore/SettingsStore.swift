@@ -32,6 +32,9 @@ public struct HotkeySpec: Codable, Equatable, Sendable {
     /// while a hide assertion holds, so Pelmet offers one that runs the
     /// clock relay. kVK_ANSI_N = 0x2D.
     public static let notificationCenterDefault = HotkeySpec(keyCode: 0x2D, modifiers: 0x900, display: "⌥⌘N")
+    /// ⌥⌘K opens the command bar (⌥⌘Space belongs to Finder's search
+    /// window). kVK_ANSI_K = 0x28.
+    public static let searchDefault = HotkeySpec(keyCode: 0x28, modifiers: 0x900, display: "⌥⌘K")
 
     private enum CodingKeys: String, CodingKey { case keyCode, modifiers, display }
 
@@ -344,6 +347,13 @@ public struct SettingsStore: Codable, Equatable, Sendable {
     public var hotkey: HotkeySpec? = .default
     public var settingsHotkey: HotkeySpec? = .settingsDefault
     public var alwaysHiddenHotkey: HotkeySpec? = .alwaysHiddenDefault
+    public var searchHotkey: HotkeySpec? = .searchDefault
+    /// A shortcut per menu bar item that opens its menu, keyed by the item's
+    /// `sectionKey`. Set from the command bar's actions; absent = none.
+    public var itemHotkeys: [String: HotkeySpec] = [:]
+    /// The user's own name for an item, keyed by `sectionKey`. The command
+    /// bar's search matches it above everything else the item carries.
+    public var itemAliases: [String: String] = [:]
 
     public var revealTriggers = RevealTriggers()
     public var autoRehide: Bool = true
@@ -445,7 +455,8 @@ public struct SettingsStore: Codable, Equatable, Sendable {
     // failing the whole decode and silently resetting the user's settings)
 
     private enum CodingKeys: String, CodingKey {
-        case onboardingCompleted, launchAtLogin, showStatusItem, hotkey, settingsHotkey, alwaysHiddenHotkey
+        case onboardingCompleted, launchAtLogin, showStatusItem, hotkey, settingsHotkey, alwaysHiddenHotkey, searchHotkey
+        case itemHotkeys, itemAliases
         case revealTriggers, autoRehide, rehideDelay, rehideOnClickElsewhere, revealAnimation
         case hideSystemExtras, showMediaControls, extraItems, sectionModel, separators
         case displayTemplate, displayOverrides
@@ -471,6 +482,9 @@ public struct SettingsStore: Codable, Equatable, Sendable {
         hotkey = field(HotkeySpec?.self, .hotkey, defaults.hotkey) ?? defaults.hotkey
         settingsHotkey = field(HotkeySpec?.self, .settingsHotkey, defaults.settingsHotkey) ?? defaults.settingsHotkey
         alwaysHiddenHotkey = field(HotkeySpec?.self, .alwaysHiddenHotkey, defaults.alwaysHiddenHotkey) ?? defaults.alwaysHiddenHotkey
+        searchHotkey = field(HotkeySpec?.self, .searchHotkey, defaults.searchHotkey) ?? defaults.searchHotkey
+        itemHotkeys = field([String: HotkeySpec].self, .itemHotkeys, defaults.itemHotkeys)
+        itemAliases = field([String: String].self, .itemAliases, defaults.itemAliases)
         revealTriggers = field(RevealTriggers.self, .revealTriggers, defaults.revealTriggers)
         autoRehide = field(Bool.self, .autoRehide, defaults.autoRehide)
         rehideDelay = field(TimeInterval.self, .rehideDelay, defaults.rehideDelay)

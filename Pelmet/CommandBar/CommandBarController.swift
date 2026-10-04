@@ -1,0 +1,810 @@
+// CommandBarController.swift
+// Search the menu bar from the keyboard (docs/COMMAND-BAR.md). A shortcut
+// opens a non-activating glass panel under the bar, key at once so the first
+// letter lands in the field; the app you were in stays in front. Return
+// closes the panel and then hands the pick to the press relay, which opens
+// the item's own menu in the real bar.
+//
+// The corpus is built when the panel opens (candidates fold their text once),
+// so a keystroke only ranks. Everything is logged under `search:` with its
+// timings, so the budgets are read from the log.
+
+import AppKit
+import Carbon.HIToolbox
+import PelmetCore
+import PelmetEngine
+import SwiftUI
+
+@MainActor
+final class CommandBarController {
+    private weak var appState: AppState?
+    private let model = CommandBarModel()
+    private var panel: KeyableGlassPanel?
+
+    private var candidates: [SearchCandidate] = []
+    private var entries: [String: CommandBarEntry] = [:]
+
+    /// What was picked, for ranking. Its own defaults key, never the
+    /// settings blob.
+    private var history: SearchHistory
+    private static let historyKey = "app.fif7y.Pelmet.search.v1"
+    private static let restRows = 5
+    private static let resultRows = 20
+
+    private(set) var isOpen = false
+    private var openedAt = Date.distantPast
+    /// Bumped by every open and close: a close's completion that finds it
+    /// changed belongs to an earlier close and does nothing.
+    private var generation = 0
+    private var placement: (screen: NSScreen, right: CGFloat)?
+    private var reKeyed = false
+    private var keyMonitor: Any?
+    private var clickMonitor: Any?
+    private var resignObserver: NSObjectProtocol?
+    private var announceTask: Task<Void, Never>?
+
+    /// What the panel shows. ⌘K moves between the first two; the last two
+    /// are the actions that ask for something instead of doing it.
+    private enum Mode { case results, actions, shortcut, alias }
+    private var mode = Mode.results
+    /// The row whose actions are showing, and the actions it offers.
+    private var actionsEntry: CommandBarEntry?
+    private var actionItems: [CommandBarActionItem] = []
+    /// The results' query and selected row, put back when ⌘K returns.
+    private var resultsQuery = ""
+    private var resultsSelectedID: String?
+
+    init(appState: AppState) {
+        self.appState = appState
+        history = Self.loadHistory()
+    }
+
+    // MARK: - Open / close
+
+    func toggle(source: String) {
+        isOpen ? close(reason: source) : open(source: source)
+    }
+
+    /// Build the panel ahead of the first shortcut, so that one does not pay
+    /// for the first SwiftUI pass.
+    func warm() {
+        _ = ensurePanel()
+    }
+
+    func open(source: String) {
+        guard !isOpen, let appState,
+              let screen = NSScreen.underPointer ?? NSScreen.main ?? NSScreen.screens.first
+        else { return }
+        let started = ProcessInfo.processInfo.systemUptime
+        func elapsed() -> Double { (ProcessInfo.processInfo.systemUptime - started) * 1000 }
+        let panel = ensurePanel()
+
+        generation += 1
+        isOpen = true
+        openedAt = .now
+        reKeyed = false
+        model.query = ""
+        model.completion = nil
+        model.rows = []
+        model.showsNoResults = false
+        model.selected = 0
+        model.field?.setText("")
+        resetMode()
+        placement = (screen, anchorRight(on: screen, appState: appState))
+        // Reopened mid-exit it fades back in from where it is.
+        if !panel.isVisible { panel.alphaValue = 0 }
+        panel.ignoresMouseEvents = false
+        panel.place(frame(rows: 0), display: false)
+
+        // Key and focused in this turn, before anything slower: a letter
+        // typed now waits in the queue and lands in the field.
+        takeKey(panel)
+        panel.contentView?.layoutSubtreeIfNeeded()
+        panel.invalidateShadow()
+        if !focusField() {
+            DispatchQueue.main.async { [weak self] in
+                if self?.focusField() != true { PelmetLog.log("search: the field was not ready to take focus") }
+            }
+        }
+        let keyMs = elapsed()
+        installMonitors()
+
+        let built = CommandBarCorpus.build(appState: appState)
+        candidates = built.map(\.candidate)
+        entries = Dictionary(built.map { ($0.candidate.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let corpusMs = elapsed() - keyMs
+        showRest()
+        animateIn(panel)
+        PelmetLog.log(String(
+            format: "search: opened (%@) — key in %.1fms, %d candidates in %.1fms, %d rest row(s), ready at %.1fms",
+            source, keyMs, candidates.count, corpusMs, model.rows.count, elapsed()
+        ))
+    }
+
+    /// Fade out first; whatever the caller does next (an action) does not
+    /// wait for it.
+    func close(reason: String) {
+        guard isOpen, let panel else { return }
+        isOpen = false
+        generation += 1
+        let mine = generation
+        removeMonitors()
+        announceTask?.cancel()
+        // The panel stays up for the length of its fade: a click on it
+        // must not land, and a click beneath it must.
+        panel.ignoresMouseEvents = true
+        PelmetLog.log(String(format: "search: closed (%@) after %.1fs", reason, Date().timeIntervalSince(openedAt)))
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = AppTiming.searchExit
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.55, 0, 0.8, 0.4)
+            panel.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            // AppKit calls this on the main thread but does not say so.
+            Task { @MainActor in self?.finishClose(mine) }
+        })
+    }
+
+    private func finishClose(_ closedAt: Int) {
+        guard closedAt == generation, !isOpen, let panel else { return }
+        panel.orderOut(nil)
+        panel.ignoresMouseEvents = false
+        panel.alphaValue = 0
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { model.entered = false }
+        model.rows = []
+        resetMode()
+    }
+
+    /// Back to plain results with nothing of an earlier ⌘K left in the model.
+    private func resetMode() {
+        mode = .results
+        actionsEntry = nil
+        actionItems = []
+        resultsQuery = ""
+        resultsSelectedID = nil
+        model.chip = nil
+        model.input = nil
+        model.inputMessage = nil
+        model.placeholder = String(localized: "Search the menu bar")
+    }
+
+    private func animateIn(_ panel: KeyableGlassPanel) {
+        // Reduce Motion keeps the fade and drops the 4pt travel.
+        let reduced = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        model.dropOffset = reduced ? 0 : 4
+        let curve = CAMediaTimingFunction(controlPoints: 0.16, 1, 0.3, 1)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = AppTiming.searchEntrance
+            context.timingFunction = curve
+            panel.animator().alphaValue = 1
+        }
+        withAnimation(.timingCurve(0.16, 1, 0.3, 1, duration: AppTiming.searchEntrance)) {
+            model.entered = true
+        }
+    }
+
+    private func ensurePanel() -> KeyableGlassPanel {
+        if let panel { return panel }
+        let hosting = NSHostingView(rootView: CommandBarView(
+            model: model,
+            onQueryChange: { [weak self] in self?.queryChanged($0) },
+            onChoose: { [weak self] index, modifiers in self?.choose(index: index, modifiers: modifiers) }
+        ))
+        // The panel's frame is ours; the content must not resize it.
+        hosting.sizingOptions = []
+        let panel = KeyableGlassPanel(content: hosting)
+        panel.setContentSize(NSSize(width: CommandBarLayout.width, height: CommandBarLayout.panelHeight(rows: 0)))
+        // Lays the SwiftUI tree out now, so the field exists before the
+        // first shortcut needs it as first responder.
+        panel.contentView?.layoutSubtreeIfNeeded()
+        self.panel = panel
+        return panel
+    }
+
+    /// Ordered front and made key without activating the app, so the app
+    /// you were in stays in front.
+    private func takeKey(_ panel: KeyableGlassPanel) {
+        panel.orderFrontRegardless()
+        panel.makeKey()
+    }
+
+    @discardableResult
+    private func focusField() -> Bool {
+        guard let panel, let field = model.field?.field else { return false }
+        return panel.makeFirstResponder(field)
+    }
+
+    // MARK: - Placement
+
+    /// Right-aligned under the bar: its right edge on Pelmet's chevron when
+    /// it is shown, else the display's edge less a margin. The chevron's
+    /// distance from the primary display's right edge carries over to other
+    /// displays (their bars lay out the same way).
+    private func anchorRight(on screen: NSScreen, appState: AppState) -> CGFloat {
+        var right = screen.frame.maxX - GlassPanel.edgeMargin
+        if appState.settings.showStatusItem, let snapshot = appState.snapshot,
+           let frame = appState.pelmetChevronItem(in: snapshot)?.frame,
+           let primary = NSScreen.screens.first {
+            let distance = primary.frame.maxX - frame.maxX
+            if distance >= 0, distance < screen.frame.width / 2 {
+                right = min(right, screen.frame.maxX - distance)
+            }
+        }
+        return right
+    }
+
+    private func frame(rows: Int) -> NSRect {
+        frame(listHeight: rows > 0 ? CommandBarLayout.listHeight(rows: rows) : 0)
+    }
+
+    private func frame(listHeight: CGFloat) -> NSRect {
+        guard let placement else { return .zero }
+        let screen = placement.screen
+        let margin = GlassPanel.edgeMargin
+        let top = GlassPanel.topUnderBar(of: screen)
+        let height = min(CommandBarLayout.panelHeight(listHeight: listHeight), top - screen.frame.minY - margin)
+        let width = min(CommandBarLayout.width, screen.frame.width - 2 * margin)
+        let left = max(placement.right - width, screen.frame.minX + margin)
+        return NSRect(x: left.rounded(), y: (top - height).rounded(), width: width.rounded(), height: height.rounded())
+    }
+
+    /// Height follows the rows; the top edge stays under the bar.
+    private func fitPanel() {
+        guard let panel else { return }
+        let wanted: NSRect
+        if model.input != nil {
+            wanted = frame(listHeight: CommandBarLayout.inputListHeight)
+        } else {
+            wanted = frame(rows: model.rows.isEmpty ? (model.showsNoResults ? 1 : 0) : model.rows.count)
+        }
+        if panel.frame != wanted { panel.place(wanted) }
+    }
+
+    // MARK: - Ranking
+
+    private func showRest() {
+        apply(SearchRanker.restState(candidates: candidates, history: history, now: .now, limit: Self.restRows), rest: true)
+    }
+
+    func queryChanged(_ text: String) {
+        guard isOpen else { return }
+        if mode == .actions {
+            model.query = text
+            showActions(filter: text)
+            return
+        }
+        guard mode == .results else { return }
+        let started = ProcessInfo.processInfo.systemUptime
+        model.query = text
+        guard !FoldedText.normalized(text).isEmpty else {
+            showRest()
+            return
+        }
+        let matches = SearchRanker.rank(
+            query: text, candidates: candidates, history: history, now: .now, limit: Self.resultRows
+        )
+        apply(matches, rest: false)
+        PelmetLog.log(String(
+            format: "search: rank %d char(s) → %d row(s) in %.2fms",
+            text.count, matches.count, (ProcessInfo.processInfo.systemUptime - started) * 1000
+        ))
+        scheduleAnnouncement()
+    }
+
+    private func apply(_ matches: [SearchMatch], rest: Bool) {
+        model.rows = matches.compactMap(row(for:))
+        model.selected = 0
+        model.showsNoResults = !rest && matches.isEmpty
+        model.completion = rest ? nil : matches.first.flatMap { SearchRanker.completion(query: model.query, for: $0) }
+        model.resultsVersion += 1
+        fitPanel()
+    }
+
+    private func row(for match: SearchMatch) -> CommandBarRow? {
+        let candidate = match.candidate
+        guard let entry = entries[candidate.id] else { return nil }
+        var synonym: String?
+        if match.field == .keyword || match.field == .alias, let text = match.matchedText {
+            synonym = "\(text) → \(candidate.title)"
+        }
+        var sectionTag: String?
+        var label = candidate.title
+        switch candidate.kind {
+        case .item:
+            switch candidate.section {
+            case .hidden:
+                sectionTag = String(localized: "Hidden")
+                label = String(localized: "\(candidate.title), hidden")
+            case .alwaysHidden:
+                sectionTag = String(localized: "Always Hidden")
+                label = String(localized: "\(candidate.title), always hidden")
+            case .visible, nil:
+                break
+            }
+        case .launcher:
+            label = String(localized: "\(candidate.title), not running")
+        case .setting:
+            label = String(localized: "\(candidate.title), setting in \(candidate.subtitle ?? "")")
+        case .command:
+            break
+        }
+        return CommandBarRow(
+            id: candidate.id, title: candidate.title, titleRanges: match.titleRanges,
+            subtitle: candidate.subtitle, glyph: entry.glyph, synonymTag: synonym,
+            sectionTag: sectionTag,
+            trailing: candidate.kind == .item ? appState?.settings.itemHotkeys[candidate.id]?.display : nil,
+            accessibilityLabel: label
+        )
+    }
+
+    /// The result count, said once typing pauses; VoiceOver only.
+    private func scheduleAnnouncement() {
+        guard NSWorkspace.shared.isVoiceOverEnabled else { return }
+        announceTask?.cancel()
+        announceTask = Task { [weak self] in
+            try? await Task.sleep(for: AppTiming.searchAnnounceDelay)
+            guard !Task.isCancelled, let self, self.isOpen else { return }
+            let count = self.model.rows.count
+            self.announce(count == 0 ? String(localized: "No results")
+                : count == 1 ? String(localized: "1 result")
+                : String(localized: "\(count) results"))
+        }
+    }
+
+    private func announce(_ text: String) {
+        guard NSWorkspace.shared.isVoiceOverEnabled else { return }
+        NSAccessibility.post(
+            element: model.field?.field as Any,
+            notification: .announcementRequested,
+            userInfo: [.announcement: text, .priority: NSAccessibilityPriorityLevel.high.rawValue]
+        )
+    }
+
+    // MARK: - Keys
+
+    private func installMonitors() {
+        removeMonitors()
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            let consumed = MainActor.assumeIsolated { self?.handleKey(event) ?? false }
+            return consumed ? nil : event
+        }
+        // A click in another app or on the bar changes no key window here,
+        // so the resign-key close alone would leave the panel up.
+        clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
+            MainActor.assumeIsolated { self?.close(reason: "click outside") }
+        }
+        if let panel {
+            resignObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.didResignKeyNotification, object: panel, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.panelResignedKey() }
+            }
+        }
+    }
+
+    private func removeMonitors() {
+        if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+        if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
+        if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
+        keyMonitor = nil
+        clickMonitor = nil
+        resignObserver = nil
+    }
+
+    /// Losing key is a click elsewhere, and closes. The first moments are
+    /// the exception: the right-click menu or the app that was in front
+    /// handing focus over looks the same, and a panel that closed there
+    /// would never have been seen. It takes key back once.
+    private func panelResignedKey() {
+        guard isOpen, let panel else { return }
+        if !reKeyed, Date().timeIntervalSince(openedAt) < AppTiming.searchResignGuard {
+            reKeyed = true
+            PelmetLog.log(String(format: "search: lost key %.0fms after opening — taken back", Date().timeIntervalSince(openedAt) * 1000))
+            takeKey(panel)
+            focusField()
+            return
+        }
+        close(reason: "lost focus")
+    }
+
+    /// True when the key was ours. Marked text (an input method mid-word)
+    /// keeps every key.
+    private func handleKey(_ event: NSEvent) -> Bool {
+        guard isOpen, event.window === panel else { return false }
+        if (panel?.firstResponder as? NSTextView)?.hasMarkedText() == true { return false }
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            .subtracting([.capsLock, .numericPad, .function])
+        // Recording takes every key but ⎋: ⌘K, ↩ and the arrows are all
+        // combinations someone may want.
+        if mode == .shortcut { return recordShortcut(event, flags: flags) }
+        switch event.keyCode {
+        case 53 where flags.isEmpty: // ⎋ steps back one level, then closes
+            escape()
+            return true
+        case 36, 76: // ↩ and the keypad's
+            if mode == .alias {
+                commitAlias()
+            } else {
+                choose(index: model.selected, modifiers: flags)
+            }
+            return true
+        case 125 where flags.isEmpty && mode != .alias: // ↓
+            move(1)
+            return true
+        case 126 where flags.isEmpty && mode != .alias: // ↑
+            move(-1)
+            return true
+        case 48 where flags.isEmpty: // ⇥ keeps focus in the field either way
+            _ = acceptCompletion()
+            return true
+        case 124 where flags.isEmpty: // →, at the end of the text
+            return model.field?.caretAtEnd == true && acceptCompletion()
+        case 43 where flags == .command: // ⌘,
+            close(reason: "settings")
+            appState?.openSettings()
+            return true
+        case 40 where flags == .command: // ⌘K
+            toggleActions()
+            return true
+        default:
+            break
+        }
+        // The panel has no Edit menu to route these through.
+        if flags == .command, let editor = panel?.firstResponder as? NSTextView, let key = event.charactersIgnoringModifiers {
+            switch key {
+            case "a": editor.selectAll(nil)
+            case "c": editor.copy(nil)
+            case "x": editor.cut(nil)
+            case "v": editor.paste(nil)
+            default: return false
+            }
+            return true
+        }
+        return false
+    }
+
+    private func move(_ delta: Int) {
+        let count = model.rows.count
+        guard count > 0 else { return }
+        model.selected = (model.selected + delta + count) % count
+    }
+
+    /// Take the top row's completion into the field: its title, so the
+    /// typed part takes the title's own casing too.
+    private func acceptCompletion() -> Bool {
+        guard mode == .results, model.completion != nil, let top = model.rows.first, let field = model.field else { return false }
+        field.setText(top.title)
+        queryChanged(top.title)
+        return true
+    }
+
+    // MARK: - Choosing
+
+    func choose(index: Int, modifiers: NSEvent.ModifierFlags) {
+        guard isOpen, model.rows.indices.contains(index) else { return }
+        switch mode {
+        case .results: chooseResult(index: index, modifiers: modifiers)
+        case .actions: chooseAction(index: index, modifiers: modifiers)
+        case .shortcut, .alias: break
+        }
+    }
+
+    private func chooseResult(index: Int, modifiers: NSEvent.ModifierFlags) {
+        guard let appState, let entry = entries[model.rows[index].id] else { return }
+        // ⌘ and ⌥ change what a press of an item does; nothing else has a
+        // second meaning, so a modified Return on it is not a Return.
+        let modified = modifiers.contains(.command) || modifiers.contains(.option)
+        if modified, !entry.isItem { return }
+        commit(entry, modifiers: modifiers, query: model.query, row: index, of: model.rows.count, appState: appState)
+    }
+
+    /// Records the pick, closes with the exit animation, then runs it.
+    private func commit(
+        _ entry: CommandBarEntry, modifiers: NSEvent.ModifierFlags, query: String,
+        row: Int?, of count: Int?, appState: AppState
+    ) {
+        history.record(id: entry.candidate.id, query: query, at: .now)
+        saveHistory()
+        let how = modifiers.contains(.command) ? "⌘↩" : modifiers.contains(.option) ? "⌥↩" : "↩"
+        let place = row.map { ", row \($0 + 1) of \(count ?? 0)" } ?? ""
+        PelmetLog.log("search: chose \(entry.candidate.id) (\(entry.candidate.kind.rawValue)\(place)) with \(how) — \(Self.describe(entry.action, modifiers: modifiers))")
+        close(reason: "chose")
+        perform(entry.action, modifiers: modifiers, appState: appState)
+    }
+
+    private static func describe(_ action: CommandBarEntry.Action, modifiers: NSEvent.ModifierFlags) -> String {
+        switch action {
+        case .item:
+            modifiers.contains(.command) ? "show in bar" : modifiers.contains(.option) ? "open menu (secondary)" : "open menu"
+        case .launcher: "open the app"
+        case .command(let command): "command \(command.key)"
+        case .setting(let tab, let row): "settings tab \(tab.rawValue), row \(row)"
+        }
+    }
+
+    private func perform(_ action: CommandBarEntry.Action, modifiers: NSEvent.ModifierFlags, appState: AppState) {
+        switch action {
+        case .item(let id):
+            if modifiers.contains(.command) {
+                appState.showItemInBar(id)
+            } else if modifiers.contains(.option) {
+                appState.openItemMenu(id, button: .secondary)
+            } else {
+                appState.openItemMenu(id)
+            }
+        case .launcher(let bundleID):
+            Self.open(bundleID)
+        case .command(let command):
+            switch command {
+            case .toggleHidden: appState.toggle(reason: .hotkey)
+            case .showAll: appState.toggleAll(reason: .hotkey)
+            case .editLayout: appState.openSettings(tab: .menuBar)
+            case .animation(let style):
+                appState.settings.revealAnimation = style
+                appState.settingsChanged()
+            case .checkForUpdates: SparkleController.shared.checkForUpdates()
+            case .settings: appState.openSettings()
+            case .quit: NSApp.terminate(nil)
+            }
+        case .setting(let tab, let row):
+            appState.openSettings(tab: tab, row: row)
+        }
+    }
+
+    private static func open(_ bundleID: String) {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+            PelmetLog.log("search: no app for \(bundleID)")
+            return
+        }
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration()) { _, error in
+            if let error { PelmetLog.log("search: opening \(bundleID) failed — \(error.localizedDescription)") }
+        }
+    }
+
+    // MARK: - Actions (⌘K)
+
+    /// ⎋: out of an input back to the actions, out of the actions back to the
+    /// results, out of the results closes.
+    private func escape() {
+        switch mode {
+        case .results: close(reason: "escape")
+        case .actions: leaveActions()
+        case .shortcut, .alias: endInput(selecting: actionsSelection)
+        }
+    }
+
+    private func toggleActions() {
+        switch mode {
+        case .results: enterActions()
+        case .actions, .alias: leaveActions()
+        case .shortcut: break
+        }
+    }
+
+    /// The selected row's actions take the results' place in the same panel.
+    /// Commands and settings have none, so ⌘K there does nothing.
+    private func enterActions() {
+        guard let appState, model.rows.indices.contains(model.selected),
+              let entry = entries[model.rows[model.selected].id]
+        else { return }
+        let items = CommandBarActions.list(for: entry, appState: appState, history: history)
+        guard !items.isEmpty else { return }
+        resultsQuery = model.query
+        resultsSelectedID = entry.candidate.id
+        actionsEntry = entry
+        actionItems = items
+        mode = .actions
+        model.chip = CommandBarChip(glyph: entry.glyph, title: entry.candidate.title)
+        model.placeholder = String(localized: "Filter actions")
+        model.completion = nil
+        model.showsNoResults = false
+        model.field?.setText("")
+        model.query = ""
+        showActions(filter: "")
+        PelmetLog.log("search: ⌘K — \(items.count) action(s) for \(entry.candidate.id)")
+        announce(String(localized: "Actions for \(entry.candidate.title)"))
+    }
+
+    /// Back to the results with the query as it was, on the row ⌘K was on.
+    private func leaveActions() {
+        mode = .results
+        actionsEntry = nil
+        actionItems = []
+        model.chip = nil
+        model.input = nil
+        model.inputMessage = nil
+        model.placeholder = String(localized: "Search the menu bar")
+        let query = resultsQuery
+        model.field?.setText(query)
+        focusField()
+        queryChanged(query)
+        if let id = resultsSelectedID, let index = model.rows.firstIndex(where: { $0.id == id }) {
+            model.selected = index
+        }
+    }
+
+    /// The action list for `filter`, keeping `selecting` selected when it is
+    /// still there.
+    private func showActions(filter: String, selecting: CommandBarAction? = nil) {
+        let shown = CommandBarActions.filtered(actionItems, query: filter)
+        model.rows = shown.map { hit in
+            CommandBarRow(
+                id: hit.item.action.key, title: hit.item.title, titleRanges: hit.ranges, subtitle: nil,
+                glyph: .symbol(hit.item.symbol), synonymTag: nil, sectionTag: nil, trailing: hit.item.trailing,
+                accessibilityLabel: hit.item.trailing.map { "\(hit.item.title), \($0)" } ?? hit.item.title
+            )
+        }
+        model.selected = selecting.flatMap { wanted in shown.firstIndex { $0.item.action == wanted } } ?? 0
+        model.showsNoResults = shown.isEmpty
+        model.completion = nil
+        model.resultsVersion += 1
+        fitPanel()
+    }
+
+    /// What the actions list had selected, to land on it again after an input.
+    private var actionsSelection: CommandBarAction? {
+        guard model.rows.indices.contains(model.selected) else { return nil }
+        return actionItems.first { $0.action.key == model.rows[model.selected].id }?.action
+    }
+
+    private func chooseAction(index: Int, modifiers: NSEvent.ModifierFlags) {
+        guard let appState, let entry = actionsEntry else { return }
+        var chosen = actionItems.first { $0.action.key == model.rows[index].id }?.action
+        // The keys on the rows work from anywhere in the list.
+        if modifiers.contains(.command) {
+            chosen = actionItems.contains { $0.action == .showInBar } ? .showInBar : nil
+        } else if modifiers.contains(.option) {
+            chosen = actionItems.contains { $0.action == .rightClick } ? .rightClick : nil
+        }
+        guard let chosen else { return }
+        PelmetLog.log("search: action \(chosen.key) on \(entry.candidate.id)")
+
+        switch (chosen, entry.action) {
+        case (.openMenu, .item), (.showInBar, .item), (.rightClick, .item):
+            let how: NSEvent.ModifierFlags = chosen == .showInBar ? .command : chosen == .rightClick ? .option : []
+            commit(entry, modifiers: how, query: resultsQuery, row: nil, of: nil, appState: appState)
+        case (.openLauncher, .launcher):
+            commit(entry, modifiers: [], query: resultsQuery, row: nil, of: nil, appState: appState)
+        case (.move(let section), .item(let id)):
+            close(reason: "moved")
+            appState.moveItem(id, to: section, before: nil)
+        case (.setShortcut, .item):
+            beginInput(.shortcut, title: model.rows[index].title)
+        case (.removeShortcut, .item(let id)):
+            appState.setItemHotkey(nil, for: id)
+            refreshActions(selecting: .setShortcut)
+        case (.setAlias, .item(let id)):
+            model.aliasDraft = appState.settings.itemAliases[id.rawValue] ?? ""
+            beginInput(.alias, title: model.rows[index].title)
+        case (.openApp, _):
+            close(reason: "open app")
+            if let app = entry.app { Self.open(app.bundleID) }
+        case (.quitApp, _):
+            close(reason: "quit app")
+            if let app = entry.app {
+                for running in NSRunningApplication.runningApplications(withBundleIdentifier: app.bundleID) { running.terminate() }
+            }
+        case (.forget, _):
+            history.forget(id: entry.candidate.id)
+            saveHistory()
+            close(reason: "forgot")
+        default:
+            break
+        }
+    }
+
+    /// The same actions again after one changed what they show (a shortcut
+    /// set or removed, an alias saved).
+    private func refreshActions(selecting: CommandBarAction?) {
+        guard let appState, let entry = actionsEntry else { return }
+        actionItems = CommandBarActions.list(for: entry, appState: appState, history: history)
+        model.field?.setText("")
+        model.query = ""
+        showActions(filter: "", selecting: selecting)
+    }
+
+    // MARK: Inputs
+
+    private func beginInput(_ input: CommandBarInput, title: String) {
+        mode = input == .shortcut ? .shortcut : .alias
+        model.input = input
+        model.inputTitle = title.replacingOccurrences(of: "…", with: "")
+        model.inputMessage = nil
+        model.inputCaption = input == .shortcut
+            ? String(localized: "Press the new shortcut. ⎋ cancels.")
+            : String(localized: "Press ↩ to save, ⎋ to cancel. Leave it empty to remove the alias.")
+        fitPanel()
+    }
+
+    /// Back to the actions list from an input.
+    private func endInput(selecting: CommandBarAction?) {
+        mode = .actions
+        model.input = nil
+        model.inputMessage = nil
+        refreshActions(selecting: selecting)
+        // The alias field is gone; the filter field is the one to type in.
+        focusField()
+    }
+
+    private func commitAlias() {
+        guard let appState, let entry = actionsEntry, case .item(let id) = entry.action else { return }
+        appState.setItemAlias(model.aliasField?.field.stringValue ?? "", for: id)
+        // Only this row's candidate changes; the corpus is not rebuilt.
+        let alias = appState.settings.itemAliases[id.rawValue]
+        let updated = entry.with(candidate: entry.candidate.withAlias(alias))
+        if let index = candidates.firstIndex(where: { $0.id == entry.candidate.id }) { candidates[index] = updated.candidate }
+        entries[updated.candidate.id] = updated
+        actionsEntry = updated
+        endInput(selecting: .setAlias)
+    }
+
+    /// True: the recorder took the key.
+    private func recordShortcut(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
+        guard let appState, let entry = actionsEntry, case .item(let id) = entry.action else { return false }
+        if event.keyCode == UInt16(kVK_Escape), flags.isEmpty {
+            escape()
+            return true
+        }
+        let mods = ShortcutRecorder.carbonModifiers(from: flags)
+        // A bare key (or shift alone) would hijack typing in every app.
+        guard mods & ~UInt32(shiftKey) != 0 else {
+            NSSound.beep()
+            model.inputMessage = String(localized: "Hold ⌘, ⌥ or ⌃ with the key, so it doesn't type into other apps.")
+            return true
+        }
+        let spec = HotkeySpec(
+            keyCode: UInt32(event.keyCode),
+            modifiers: mods,
+            display: ShortcutRecorder.symbols(flags)
+                + ShortcutRecorder.keyName(keyCode: Int(event.keyCode), chars: event.charactersIgnoringModifiers)
+        )
+        if let refusal = appState.setItemHotkey(spec, for: id) {
+            NSSound.beep()
+            model.inputMessage = Self.message(for: refusal, spec: spec)
+            PelmetLog.log("search: shortcut \(spec.display) for \(id.rawValue) refused — \(refusal)")
+            return true
+        }
+        endInput(selecting: .setShortcut)
+        return true
+    }
+
+    /// Why a combination was refused and what to do about it.
+    private static func message(for refusal: AppState.ItemHotkeyRefusal, spec: HotkeySpec) -> String {
+        switch refusal {
+        case .pelmet(let what):
+            String(localized: "\(spec.display) is already Pelmet's shortcut for “\(what)”. Press a different combination.")
+        case .item(let other):
+            String(localized: "\(spec.display) already opens \(ItemNaming.displayName(for: other)). Press a different combination.")
+        case .system:
+            String(localized: "macOS already uses \(spec.display). Press a different combination.")
+        case .otherApp:
+            String(localized: "Another app already uses \(spec.display). Press a different combination.")
+        }
+    }
+
+    // MARK: - History
+
+    private static func loadHistory() -> SearchHistory {
+        guard let data = UserDefaults.standard.data(forKey: historyKey),
+              let history = try? JSONDecoder().decode(SearchHistory.self, from: data)
+        else { return SearchHistory() }
+        return history
+    }
+
+    private func saveHistory() {
+        guard let data = try? JSONEncoder().encode(history) else { return }
+        UserDefaults.standard.set(data, forKey: Self.historyKey)
+        appState?.searchHistoryRevision += 1
+    }
+
+    /// Picks remembered, for the Settings row that resets them.
+    var historyPickCount: Int { history.picks.count }
+
+    /// Settings › General › Reset Search History.
+    func resetHistory() {
+        history.reset()
+        saveHistory()
+        PelmetLog.log("search: history reset")
+    }
+}

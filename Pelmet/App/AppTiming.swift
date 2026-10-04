@@ -169,4 +169,42 @@ enum AppTiming {
     /// « expansion → re-measure: the trapped items reflow in left of the
     /// notch and the visible run shifts (~38pt) before frames are true.
     static let overflowExpandSettle: Duration = .milliseconds(700)
+
+    /// Item press (ItemPress): how long a click gets to show a menu or
+    /// panel before the item goes back, and how long an open one keeps the
+    /// item revealed beneath the cover.
+    static let pressMenuWait: TimeInterval = 3
+    static let pressMenuCap: TimeInterval = 60
+    /// When the only sign the press showed something is the app coming to
+    /// the front, the item stays revealed at most this long.
+    static let pressFrontCap: TimeInterval = 3
+    /// A revealed item is clicked once its frame reads the same on two
+    /// walks in a row (within this many points), the agent's slide-in over.
+    /// Bounded: a frame that never settles is clicked where it last read.
+    static let pressFrameTolerance: CGFloat = 1
+    static let pressFrameCap: TimeInterval = 1
+    /// A press waits this long for a reveal or conceal already running.
+    static let pressTransitionWait: TimeInterval = 2
+    /// A newer press makes the one before it yield: it still waits this
+    /// long, at most, for its own menu to be gone (or to show) before the
+    /// item goes back, so it is not concealed under a menu that is opening.
+    static let pressYieldWait: TimeInterval = 0.8
+    /// The cover hides the reveal and the click, then lifts so the real icon
+    /// shows highlighted with its menu dropping from it. Not when the « was
+    /// expanded for the press: the visible run sits ~38pt from where the
+    /// cover's picture has it, and lifting would jump it. Flip to keep the
+    /// cover up through the menu (the final conceal raises its own).
+    static let pressCoverLiftsAfterClick = true
+
+    /// Command bar panel: entrance (fade + a 4pt drop) and exit (fade). The
+    /// exit is never longer than the entrance, so a Return never waits on it.
+    static let searchEntrance: TimeInterval = 0.18
+    static let searchExit: TimeInterval = 0.12
+    /// A focus change this soon after the panel opened is the menu or the
+    /// hotkey's own app handing focus over, not a click outside: the panel
+    /// takes key back once.
+    static let searchResignGuard: TimeInterval = 0.3
+    /// The result count is announced to VoiceOver this long after the last
+    /// keystroke, so typing doesn't queue one announcement per letter.
+    static let searchAnnounceDelay: Duration = .milliseconds(450)
 }

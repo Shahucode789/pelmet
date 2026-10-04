@@ -57,4 +57,35 @@ struct SettingsStoreTests {
         let back = try JSONDecoder().decode(SettingsStore.self, from: JSONEncoder().encode(settings))
         #expect(back.alwaysHiddenHotkey == settings.alwaysHiddenHotkey)
     }
+
+    // The command bar's shortcut (⌥⌘K) is never off either.
+    @Test func searchHotkeyDefaultsAndRoundTrips() throws {
+        let legacy = try JSONDecoder().decode(SettingsStore.self, from: Data("{}".utf8))
+        #expect(legacy.searchHotkey == .searchDefault)
+        #expect(HotkeySpec.searchDefault.display == "⌥⌘K")
+        let null = try JSONDecoder().decode(SettingsStore.self, from: Data(#"{"searchHotkey":null}"#.utf8))
+        #expect(null.searchHotkey == .searchDefault)
+        var settings = SettingsStore()
+        settings.searchHotkey = HotkeySpec(keyCode: 0x25, modifiers: 0x900, display: "⌥⌘L")
+        let back = try JSONDecoder().decode(SettingsStore.self, from: JSONEncoder().encode(settings))
+        #expect(back.searchHotkey == settings.searchHotkey)
+    }
+
+    // Per-item shortcuts and aliases are new fields: an older blob has none,
+    // and a bad value costs only that field.
+    @Test func itemHotkeysAndAliasesDefaultEmptyAndRoundTrip() throws {
+        let legacy = try JSONDecoder().decode(SettingsStore.self, from: Data("{}".utf8))
+        #expect(legacy.itemHotkeys.isEmpty)
+        #expect(legacy.itemAliases.isEmpty)
+        let bad = try JSONDecoder().decode(
+            SettingsStore.self, from: Data(#"{"itemHotkeys":"nope","itemAliases":[1],"autoRehide":false}"#.utf8))
+        #expect(bad.itemHotkeys.isEmpty && bad.itemAliases.isEmpty)
+        #expect(bad.autoRehide == false)
+        var settings = SettingsStore()
+        settings.itemHotkeys["bundle:com.example.app"] = HotkeySpec(keyCode: 0x0D, modifiers: 0x900, display: "⌥⌘W")
+        settings.itemAliases["bundle:com.example.app"] = "work"
+        let back = try JSONDecoder().decode(SettingsStore.self, from: JSONEncoder().encode(settings))
+        #expect(back.itemHotkeys == settings.itemHotkeys)
+        #expect(back.itemAliases == settings.itemAliases)
+    }
 }

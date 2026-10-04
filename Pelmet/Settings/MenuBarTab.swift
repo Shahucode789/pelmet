@@ -425,75 +425,7 @@ private struct ItemTile: View {
         }
     }
 
-    private var displayName: String {
-        if item.id.bundleID == PelmetBundle.textInputAgentID {
-            return InputSourcePresentation.shared.name
-        }
-        // Pelmet's own items: name the thing, not the app that hosts it.
-        switch item.id.pelmetItem {
-        case .separator: return String(localized: "Separator")
-        case .mediaControls: return String(localized: "Media")
-        case .cameraMic: return String(localized: "Camera")
-        case .airdrop: return String(localized: "AirDrop")
-        case .timer: return String(localized: "Timer")
-        case .userSwitching: return String(localized: "Users")
-        case .shortcutsMenu: return String(localized: "Shortcuts")
-        case .timeMachine: return String(localized: "Time Machine")
-        case .siri: return String(localized: "Siri")
-        case .focus: return String(localized: "Focus")
-        default: break
-        }
-        // SystemUIServer's extras enumerate as one item titled with every
-        // extra it shows ("Siri, TimeMachine"): name each, comma-joined.
-        if item.id.bundleID == PelmetBundle.systemUIServerID,
-           case .status(_, let title) = item.id.parsed {
-            let names = title.components(separatedBy: ", ").map { extra -> String in
-                switch extra {
-                case "TimeMachine": String(localized: "Time Machine")
-                case "Item-0": String(localized: "System")
-                default: extra
-                }
-            }
-            return names.joined(separator: ", ")
-        }
-        if MenuBarPolicy.systemItem(for: item.id) == .primaryBentoBox {
-            return String(localized: "Control Center")
-        }
-        if item.id.rawValue.contains("::com.apple.menuextra.") {
-            let suffix = item.id.rawValue.components(separatedBy: ".").last ?? String(localized: "System")
-            return suffix.replacingOccurrences(of: "-", with: " ").capitalized
-        }
-        // Apple's login-item extras are named after their executable
-        // ("PasswordsMenuBarExtra", "WeatherMenu"); the tile says what the
-        // icon is: the app that ships it.
-        if let bundle = item.id.bundleID, MenuBarPolicy.isBundleHideableAppleHost(bundle),
-           let shipping = Self.shippingAppName(for: bundle) {
-            return shipping
-        }
-        return item.appName ?? item.id.bundleID?.components(separatedBy: ".").last ?? "?"
-    }
-
-    /// Finder's localized name of the app a login-item extra ships inside
-    /// (…/Weather.app/Contents/Library/LoginItems/WeatherMenu.app → "Weather").
-    /// nil for a host that is its own app. One LaunchServices lookup per
-    /// bundle, then cached: the board asks on every tile render.
-    private static var shippingAppNames: [String: String?] = [:]
-    private static func shippingAppName(for bundle: String) -> String? {
-        if let cached = shippingAppNames[bundle] { return cached }
-        var name: String?
-        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle) {
-            let parts = url.pathComponents
-            // <App>.app / Contents / Library / LoginItems / <Extra>.app
-            if parts.count >= 5, parts[parts.count - 2] == "LoginItems", parts[parts.count - 3] == "Library",
-               parts[parts.count - 4] == "Contents", parts[parts.count - 5].hasSuffix(".app") {
-                let app = url.deletingLastPathComponent().deletingLastPathComponent()
-                    .deletingLastPathComponent().deletingLastPathComponent()
-                name = FileManager.default.displayName(atPath: app.path)
-            }
-        }
-        shippingAppNames[bundle] = name
-        return name
-    }
+    private var displayName: String { ItemNaming.displayName(for: item) }
 
     private var isSystemIcon: Bool {
         MenuBarPolicy.systemItem(for: item.id) != nil
