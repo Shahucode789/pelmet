@@ -149,6 +149,11 @@ struct SettingsView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            // One scroll view per tab: each pane opens at its top. With a
+            // shared one, a trackpad scroll down a long pane then a click on
+            // Displays drew a blank pane, and every tab stayed blank after
+            // (2026-10-04) — the old offset outlived the content it fit.
+            .id(appState.settingsTab)
             .ignoresSafeArea(edges: .top)
             .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y >= gapHeight - 0.5 } action: { _, pinned in
                 headerPinned = pinned
