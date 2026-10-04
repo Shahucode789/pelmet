@@ -19,6 +19,11 @@ enum CommandBarLayout {
         CGFloat(min(rows, maxRows)) * rowHeight
     }
 
+    /// The tallest the list gets: the full results, or an input row with its
+    /// two lines under it. The panel's window is this tall for as long as it
+    /// is open, and only the glass in it changes height.
+    static var tallestListHeight: CGFloat { max(listHeight(rows: maxRows), inputListHeight) }
+
     /// The input row of Set Shortcut / Alias and the two lines under it that
     /// say what to press, or why that did not take.
     static let inputListHeight: CGFloat = rowHeight + 40
@@ -196,13 +201,16 @@ struct CommandBarView: View {
     private var list: some View {
         ScrollViewReader { proxy in
             ScrollView(.vertical) {
-                // Lazy: up to 20 results, only the 8 in view draw.
+                // Lazy: up to 20 results, only the 8 in view draw. A row is
+                // its place in the list, not its item: a new ranking updates
+                // the rows in place instead of building new ones, which is
+                // a third of what a keystroke cost to draw (2026-10-04).
                 LazyVStack(spacing: 0) {
-                    ForEach(Array(model.rows.enumerated()), id: \.element.id) { index, row in
+                    ForEach(Array(model.rows.enumerated()), id: \.offset) { index, row in
                         CommandBarRowView(row: row, selected: index == model.selected) {
                             onChoose(index, NSEvent.modifierFlags)
                         }
-                        .id(row.id)
+                        .id(index)
                     }
                 }
             }
@@ -210,10 +218,10 @@ struct CommandBarView: View {
             .frame(height: CommandBarLayout.listHeight(rows: model.rows.count))
             .onChange(of: model.selected) { _, selected in
                 guard model.rows.indices.contains(selected) else { return }
-                proxy.scrollTo(model.rows[selected].id)
+                proxy.scrollTo(selected)
             }
             .onChange(of: model.resultsVersion) {
-                if let first = model.rows.first { proxy.scrollTo(first.id, anchor: .top) }
+                if !model.rows.isEmpty { proxy.scrollTo(0, anchor: .top) }
             }
         }
         .padding(.top, CommandBarLayout.listGap)
@@ -306,7 +314,7 @@ private struct CommandBarRowView: View {
     private var glyph: some View {
         switch row.glyph {
         case .image(let image):
-            Image(nsImage: image)
+            Image(nsImage: RowGlyphCache.bitmap(for: image))
                 .renderingMode(image.isTemplate ? .template : .original)
                 .resizable()
                 .interpolation(.high)
@@ -329,6 +337,51 @@ private struct CommandBarRowView: View {
             text[start..<end].font = .system(size: 13, weight: .semibold)
         }
         return text
+    }
+}
+
+/// Row glyphs as small bitmaps. An app icon is an image of many
+/// representations that SwiftUI picks from and resamples on each render; a
+/// bitmap at the glyph's size is a plain blit. Made when a row first draws
+/// and kept, for the images that outlive an open (the item icons).
+@MainActor
+enum RowGlyphCache {
+    static let side: CGFloat = 18
+    private static var bitmaps: [ObjectIdentifier: (source: NSImage, bitmap: NSImage)] = [:]
+    private static let capacity = 96
+
+    static func bitmap(for image: NSImage) -> NSImage {
+        let key = ObjectIdentifier(image)
+        // The source is kept with its bitmap: an identifier of a freed image
+        // could be handed to another.
+        if let hit = bitmaps[key], hit.source === image { return hit.bitmap }
+        let scale = NSScreen.screens.map(\.backingScaleFactor).max() ?? 2
+        let pixels = Int((side * scale).rounded())
+        guard image.size.width > 0, image.size.height > 0, pixels > 0,
+              let rep = NSBitmapImageRep(
+                  bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels, bitsPerSample: 8,
+                  samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                  bytesPerRow: 0, bitsPerPixel: 0
+              ),
+              let context = NSGraphicsContext(bitmapImageRep: rep)
+        else { return image }
+        // Fit inside the square, as the row's aspect-fit would.
+        let fit = min(CGFloat(pixels) / image.size.width, CGFloat(pixels) / image.size.height)
+        let width = image.size.width * fit, height = image.size.height * fit
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        context.imageInterpolation = .high
+        image.draw(
+            in: NSRect(x: (CGFloat(pixels) - width) / 2, y: (CGFloat(pixels) - height) / 2, width: width, height: height),
+            from: .zero, operation: .sourceOver, fraction: 1
+        )
+        NSGraphicsContext.restoreGraphicsState()
+        let bitmap = NSImage(size: NSSize(width: side, height: side))
+        bitmap.addRepresentation(rep)
+        bitmap.isTemplate = image.isTemplate
+        if bitmaps.count >= capacity { bitmaps.removeAll(keepingCapacity: true) }
+        bitmaps[key] = (image, bitmap)
+        return bitmap
     }
 }
 

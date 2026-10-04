@@ -2,9 +2,14 @@
 // The surface Pelmet's floating panels share: a borderless, non-activating
 // glass panel that hangs under the menu bar. Non-activating, so the app you
 // were in stays in front. It draws no border of its own: the rounded glass
-// is the edge, with the system shadow re-derived whenever the frame changes
+// is the edge, with the system shadow re-derived whenever the glass changes
 // (an earlier panel's edge read as a heavy near-black ring that ignored the
 // corners, and a shadow taken before the glass had its shape is the suspect).
+//
+// The window can be made as tall as the glass will ever get, with the glass
+// in it pinned to the top (`setGlassHeight`): resizing the window itself
+// waits on the window server, ~5–30ms a keystroke live (2026-10-04), and the
+// glass inside it can change height without that.
 
 import AppKit
 
@@ -12,7 +17,7 @@ import AppKit
 class GlassPanel: NSPanel {
     static let cornerRadius: CGFloat = 12
     /// The system's shadow follows the rounded glass once it is re-derived
-    /// (see `place`). If a live look still shows a dark ring at the edge,
+    /// (see `setGlassHeight`). If a live look still shows a dark ring at the edge,
     /// this is the one switch: the glass reads fine without a shadow.
     static let usesSystemShadow = true
     static let gapBelowBar: CGFloat = 4
@@ -20,19 +25,6 @@ class GlassPanel: NSPanel {
 
     /// `content` fills the glass; it is the caller's to size and lay out.
     init(content: NSView) {
-        super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        level = .statusBar
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = Self.usesSystemShadow
-        hidesOnDeactivate = false
-        isReleasedWhenClosed = false
-        animationBehavior = .none
-        // Its size is its content's: no edge resize, no drag of the surface.
-        styleMask.remove(.resizable)
-        isMovable = false
-        isMovableByWindowBackground = false
-        collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
         content.translatesAutoresizingMaskIntoConstraints = false
         let host: NSView
         if #available(macOS 26.0, *) {
@@ -57,12 +49,55 @@ class GlassPanel: NSPanel {
                 content.bottomAnchor.constraint(equalTo: effect.bottomAnchor),
             ])
         }
-        contentView = host
+        let clear = NSView(frame: .zero)
+        // Nothing a SwiftUI layer draws past the glass may reach the window's
+        // shadow: with a window taller than the glass it drew a hard ring 17pt
+        // below the glass (harness screenshots, 2026-10-04).
+        host.clipsToBounds = true
+        host.frame = clear.bounds
+        host.autoresizingMask = [.width, .minYMargin]
+        clear.addSubview(host)
+        glass = host
+        super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        level = .statusBar
+        isOpaque = false
+        backgroundColor = .clear
+        hasShadow = Self.usesSystemShadow
+        hidesOnDeactivate = false
+        isReleasedWhenClosed = false
+        animationBehavior = .none
+        // Its size is its content's: no edge resize, no drag of the surface.
+        styleMask.remove(.resizable)
+        isMovable = false
+        isMovableByWindowBackground = false
+        collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
+        contentView = clear
     }
 
-    /// Move or resize, then re-derive the shadow from what is on screen.
+    /// The glass inside the window, as tall as `setGlassHeight` last said.
+    private let glass: NSView
+
+    var glassHeight: CGFloat { glass.frame.height }
+
+    /// Where the glass is on screen; below it the window is clear.
+    var glassScreenFrame: NSRect {
+        NSRect(x: frame.minX, y: frame.maxY - glass.frame.height, width: frame.width, height: glass.frame.height)
+    }
+
+    /// Move or resize the window, then re-derive the shadow from what is on
+    /// screen.
     func place(_ frame: NSRect, display: Bool = true) {
         setFrame(frame, display: display)
+        glass.frame.size.height = min(glass.frame.height, frame.height)
+        invalidateShadow()
+    }
+
+    /// Change the glass's height inside the window, its top edge staying
+    /// put; the window is not resized. Below the glass the window is clear.
+    func setGlassHeight(_ height: CGFloat) {
+        let bounds = contentView?.bounds ?? .zero
+        let height = min(height, bounds.height)
+        glass.frame = NSRect(x: 0, y: bounds.height - height, width: bounds.width, height: height)
         invalidateShadow()
     }
 

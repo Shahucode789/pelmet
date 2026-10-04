@@ -673,6 +673,7 @@ final class AppState {
     /// Open an item's menu where it sits, whichever section it is in: on
     /// the bar it is clicked, concealed it is brought back alone beneath a
     /// cover for the click and put away once its menu is gone (ItemPress).
+    /// Pelmet's own extras run their own action instead of a click.
     /// `.secondary` is the right click. The clock opens Notification Center
     /// the way its shortcut does: a click on it is refused while the
     /// assertion is held.
@@ -701,6 +702,22 @@ final class AppState {
         }
         PelmetLog.log("press: show \(key.rawValue) — revealing \(wanted.map(\.rawValue).sorted())")
         reveal(wanted.union(currentRevealedSections), reason: .hotkey)
+    }
+
+    // MARK: - Pelmet's own extras
+
+    /// What a press on one of Pelmet's own extras needs first; nil when the
+    /// key is no extra (a separator, the chevron), which keep the click.
+    func ownPressNeed(_ key: ItemID, secondary: Bool) -> ExtrasManager.PressNeed? {
+        extras?.pressNeed(itemKey: key, rightClick: secondary)
+    }
+
+    func isOwnExtraShowing(_ key: ItemID) -> Bool { extras?.isShowing(key) ?? false }
+
+    /// Runs the extra's own action, the one its button runs on a click.
+    @discardableResult
+    func activateExtra(_ key: ItemID, secondary: Bool) -> Bool {
+        extras?.activate(itemKey: key, rightClick: secondary) ?? false
     }
 
     // MARK: - Per-item shortcuts

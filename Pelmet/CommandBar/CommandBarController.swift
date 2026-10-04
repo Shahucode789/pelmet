@@ -40,6 +40,7 @@ final class CommandBarController {
     private var reKeyed = false
     private var keyMonitor: Any?
     private var clickMonitor: Any?
+    private var moveMonitors: [Any] = []
     private var resignObserver: NSObjectProtocol?
     private var announceTask: Task<Void, Never>?
 
@@ -94,7 +95,10 @@ final class CommandBarController {
         // Reopened mid-exit it fades back in from where it is.
         if !panel.isVisible { panel.alphaValue = 0 }
         panel.ignoresMouseEvents = false
-        panel.place(frame(rows: 0), display: false)
+        panel.acceptsMouseMovedEvents = true
+        panel.place(windowFrame(), display: false)
+        panel.setGlassHeight(glassHeight(listHeight: 0))
+        letMouseThroughOffGlass()
 
         // Key and focused in this turn, before anything slower: a letter
         // typed now waits in the queue and lands in the field.
@@ -194,7 +198,8 @@ final class CommandBarController {
         // The panel's frame is ours; the content must not resize it.
         hosting.sizingOptions = []
         let panel = KeyableGlassPanel(content: hosting)
-        panel.setContentSize(NSSize(width: CommandBarLayout.width, height: CommandBarLayout.panelHeight(rows: 0)))
+        panel.setContentSize(NSSize(width: CommandBarLayout.width, height: CommandBarLayout.panelHeight(listHeight: CommandBarLayout.tallestListHeight)))
+        panel.setGlassHeight(CommandBarLayout.panelHeight(listHeight: 0))
         // Lays the SwiftUI tree out now, so the field exists before the
         // first shortcut needs it as first responder.
         panel.contentView?.layoutSubtreeIfNeeded()
@@ -234,31 +239,66 @@ final class CommandBarController {
         return right
     }
 
-    private func frame(rows: Int) -> NSRect {
-        frame(listHeight: rows > 0 ? CommandBarLayout.listHeight(rows: rows) : 0)
-    }
-
-    private func frame(listHeight: CGFloat) -> NSRect {
+    /// The window: as tall as the panel ever gets, its top edge under the
+    /// bar. It is placed once per open; what changes with the rows is the
+    /// glass in it (`fitPanel`), because resizing a window waits on the
+    /// window server.
+    private func windowFrame() -> NSRect {
         guard let placement else { return .zero }
         let screen = placement.screen
         let margin = GlassPanel.edgeMargin
         let top = GlassPanel.topUnderBar(of: screen)
-        let height = min(CommandBarLayout.panelHeight(listHeight: listHeight), top - screen.frame.minY - margin)
+        let height = min(CommandBarLayout.panelHeight(listHeight: CommandBarLayout.tallestListHeight), top - screen.frame.minY - margin)
         let width = min(CommandBarLayout.width, screen.frame.width - 2 * margin)
         let left = max(placement.right - width, screen.frame.minX + margin)
         return NSRect(x: left.rounded(), y: (top - height).rounded(), width: width.rounded(), height: height.rounded())
     }
 
-    /// Height follows the rows; the top edge stays under the bar.
+    private func glassHeight(listHeight: CGFloat) -> CGFloat {
+        min(CommandBarLayout.panelHeight(listHeight: listHeight), panel?.frame.height ?? windowFrame().height)
+    }
+
+    /// The glass's height follows the rows; its top edge stays under the bar.
     private func fitPanel() {
         guard let panel else { return }
-        let wanted: NSRect
+        let wanted: CGFloat
         if model.input != nil {
-            wanted = frame(listHeight: CommandBarLayout.inputListHeight)
+            wanted = glassHeight(listHeight: CommandBarLayout.inputListHeight)
         } else {
-            wanted = frame(rows: model.rows.isEmpty ? (model.showsNoResults ? 1 : 0) : model.rows.count)
+            let rows = model.rows.isEmpty ? (model.showsNoResults ? 1 : 0) : model.rows.count
+            wanted = glassHeight(listHeight: rows > 0 ? CommandBarLayout.listHeight(rows: rows) : 0)
         }
-        if panel.frame != wanted { panel.place(wanted) }
+        guard panel.glassHeight != wanted else { return }
+        let started = ProcessInfo.processInfo.systemUptime
+        panel.setGlassHeight(wanted)
+        letMouseThroughOffGlass()
+        fitMs += (ProcessInfo.processInfo.systemUptime - started) * 1000
+    }
+
+    /// The window stays tall while open and only the glass changes height
+    /// (a window resize per keystroke cost 5–31ms live). A clear window still
+    /// takes the click (2026-10-04: clicks under the glass did nothing), so
+    /// off the glass the panel lets the mouse through: the click reaches what
+    /// is under it and the click-outside close runs.
+    private func letMouseThroughOffGlass() {
+        guard let panel, isOpen else { return }
+        panel.ignoresMouseEvents = !panel.glassScreenFrame.contains(NSEvent.mouseLocation)
+    }
+
+    /// Milliseconds `fitPanel` spent placing the panel since it was last
+    /// zeroed: the part of a keystroke's time that is the window's.
+    private var fitMs = 0.0
+
+    /// Runs `body` when the main run loop next has nothing left to do, the
+    /// SwiftUI update a change queued behind it included. After Core
+    /// Animation's own observer (order 2,000,000).
+    private static func whenIdle(_ body: @escaping @MainActor () -> Void) {
+        let observer = CFRunLoopObserverCreateWithHandler(
+            nil, CFRunLoopActivity.beforeWaiting.rawValue, false, 3_000_000
+        ) { _, _ in
+            MainActor.assumeIsolated { body() }
+        }
+        CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .commonModes)
     }
 
     // MARK: - Ranking
@@ -284,11 +324,25 @@ final class CommandBarController {
         let matches = SearchRanker.rank(
             query: text, candidates: candidates, history: history, now: .now, limit: Self.resultRows
         )
+        let ranked = ProcessInfo.processInfo.systemUptime
+        fitMs = 0
         apply(matches, rest: false)
+        let applied = ProcessInfo.processInfo.systemUptime
+        let fit = fitMs
         PelmetLog.log(String(
-            format: "search: rank %d char(s) → %d row(s) in %.2fms",
-            text.count, matches.count, (ProcessInfo.processInfo.systemUptime - started) * 1000
+            format: "search: rank %d char(s) → %d row(s) in %.2fms (rank %.2f, apply %.2f, fit %.2f)",
+            text.count, matches.count, (applied - started) * 1000,
+            (ranked - started) * 1000, (applied - ranked) * 1000 - fit, fit
         ))
+        // The row views a change makes are built after this returns, in the
+        // update the run loop does next: this line is when it is done.
+        let chars = text.count
+        Self.whenIdle {
+            PelmetLog.log(String(
+                format: "search: %d char(s) drawn, idle %.2fms after the key",
+                chars, (ProcessInfo.processInfo.systemUptime - started) * 1000
+            ))
+        }
         scheduleAnnouncement()
     }
 
@@ -374,6 +428,17 @@ final class CommandBarController {
         clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
             MainActor.assumeIsolated { self?.close(reason: "click outside") }
         }
+        // Moves over other apps (and over the clear part, let through) arrive
+        // global, moves over the glass local.
+        moveMonitors = [
+            NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] _ in
+                MainActor.assumeIsolated { self?.letMouseThroughOffGlass() }
+            },
+            NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
+                MainActor.assumeIsolated { self?.letMouseThroughOffGlass() }
+                return event
+            },
+        ].compactMap { $0 }
         if let panel {
             resignObserver = NotificationCenter.default.addObserver(
                 forName: NSWindow.didResignKeyNotification, object: panel, queue: .main
@@ -386,9 +451,11 @@ final class CommandBarController {
     private func removeMonitors() {
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
+        moveMonitors.forEach(NSEvent.removeMonitor)
         if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
         keyMonitor = nil
         clickMonitor = nil
+        moveMonitors = []
         resignObserver = nil
     }
 

@@ -1003,8 +1003,61 @@ final class ExtrasManager {
             let statusItem = items.first(where: { $0.value.button === sender }),
             let spec = specs[statusItem.key]
         else { return }
-        let rightClick = NSApp.currentEvent?.type == .rightMouseUp
+        perform(spec, on: statusItem, rightClick: NSApp.currentEvent?.type == .rightMouseUp)
+    }
 
+    /// What a press from outside the bar (the command bar, an item's own
+    /// shortcut) needs before `activate` can run the extra's action.
+    enum PressNeed {
+        /// It runs wherever the item is: a media key, a launch, a toggle.
+        case nothing
+        /// It pops a menu from the item's own button, so the item has to be
+        /// on the bar for the menu to anchor.
+        case onBar
+        /// It opens Apple's pill at the item's spot, and only the camera
+        /// being live puts the item there: no section reveal helps.
+        case live
+    }
+
+    /// The extra that has this key; nil for a separator, the chevron, or
+    /// anything that is not one of the extras.
+    private func entry(for key: ItemID) -> (key: UUID, value: NSStatusItem)? {
+        items.first { entry in
+            specs[entry.key].map { Self.itemID(for: $0).sectionKey == key.sectionKey } ?? false
+        }
+    }
+
+    /// Which of `perform`'s presses open a menu from the button, and which
+    /// need the camera live. Keep it in step with `perform`.
+    func pressNeed(itemKey key: ItemID, rightClick: Bool) -> PressNeed? {
+        guard let entry = entry(for: key), let spec = specs[entry.key] else { return nil }
+        switch spec.kind {
+        case .mediaControls, .siri, .focus:
+            return rightClick ? .onBar : .nothing
+        case .cameraMicIndicator:
+            return rightClick ? .nothing : .live
+        case .airdrop, .shortcut:
+            return .nothing
+        case .timer:
+            return pelmetTimer?.state == .done && !rightClick ? .nothing : .onBar
+        case .userSwitching, .shortcutsMenu, .timeMachine:
+            return .onBar
+        case .appLauncher:
+            return rightClick && Self.isRunning(spec) && spec.bundleID != nil ? .onBar : .nothing
+        }
+    }
+
+    /// The action the item's button runs on a click, run directly: no
+    /// click is made on the item. A menu pops from the item when it is on
+    /// the bar, else where the pointer is. False when no extra has this key.
+    @discardableResult
+    func activate(itemKey key: ItemID, rightClick: Bool = false) -> Bool {
+        guard let entry = entry(for: key), let spec = specs[entry.key] else { return false }
+        perform(spec, on: entry, rightClick: rightClick)
+        return true
+    }
+
+    private func perform(_ spec: ExtraItemSpec, on statusItem: (key: UUID, value: NSStatusItem), rightClick: Bool) {
         switch spec.kind {
         case .mediaControls:
             if rightClick {
@@ -1025,8 +1078,8 @@ final class ExtrasManager {
             // to open, goes to Privacy settings for a quick audit.
             let privacy = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")!
             guard !rightClick else { NSWorkspace.shared.open(privacy); return }
-            guard !AudioVideoPill.clickClosedPanel(), let appState else { return }
-            let point = Self.barPoint(of: sender)
+            guard !AudioVideoPill.clickClosedPanel(), let appState, let button = statusItem.value.button else { return }
+            let point = Self.barPoint(of: button)
             // A SharePlay session with no call: Apple's SharePlay icon first.
             let ids = (sharePlayStatus?.isLive ?? false)
                 ? [AudioVideoPill.sharePlayIdentifier, AudioVideoPill.identifier]
@@ -1099,6 +1152,13 @@ final class ExtrasManager {
     }
 
     private func popUp(_ menu: NSMenu, on item: NSStatusItem) {
+        // An item out of the bar (a press from the command bar while its
+        // section stays concealed) has no spot to anchor to: the menu pops
+        // where the pointer is.
+        guard items.first(where: { $0.value === item }).map({ lastVisible[$0.key] == true }) ?? false else {
+            menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+            return
+        }
         item.menu = menu
         item.button?.performClick(nil)
         item.menu = nil

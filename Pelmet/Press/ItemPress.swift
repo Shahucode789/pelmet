@@ -16,6 +16,12 @@
 // did nothing. The cover above the bar ignores mouse events, so the click
 // reaches the item beneath it.
 //
+// Pelmet's own extras are not clicked at all: their action runs directly
+// (`pressOwn`), the one their button runs on a click. A click on our own
+// status item put the main thread in our own menu tracking, so the relay's
+// log and oracles stalled until the menu closed, and a cover, a shield and
+// a pointer warp had nothing to hide.
+//
 // One relay at a time: a press that arrives while an earlier one still waits
 // on its menu makes that one yield, then runs. A yield is a flag, never a
 // task cancellation: a cancelled task's sleeps return at once, which cut a
@@ -110,6 +116,11 @@ final class ItemPress {
         // cover, a reveal and a conceal for nothing would only flash.
         guard !run.yielded else {
             PelmetLog.log("press: \(key.rawValue) — superseded before it started")
+            return
+        }
+        if key.bundleID == PelmetBundle.mainID,
+           let need = appState.ownPressNeed(key, secondary: button == .secondary) {
+            await pressOwn(key, need: need, button: button, requested: requested, run: run)
             return
         }
         guard !appState.applying else {
@@ -238,6 +249,55 @@ final class ItemPress {
             if changesBar { transitions.pressEnded() }
         }
         PelmetLog.log("press: \(key.rawValue) done at \(ms())ms")
+    }
+
+    // MARK: - Own items
+
+    /// One of Pelmet's own extras: its action runs here, as its button would
+    /// run it. No cover, no shield, no window oracles. A menu needs the item
+    /// on the bar to anchor, so its section opens first (the item then stays
+    /// out for the rehide machine, as after a hotkey); the camera's pill
+    /// needs the camera live, which no reveal changes. The log line comes
+    /// before the call: a menu holds the main thread in its tracking until
+    /// it closes.
+    private func pressOwn(
+        _ key: ItemID, need: ExtrasManager.PressNeed, button: Button, requested: Date, run: Run
+    ) async {
+        guard let appState else { return }
+        func ms() -> Int { Int(-requested.timeIntervalSinceNow * 1000) }
+        let secondary = button == .secondary
+        switch need {
+        case .nothing:
+            break
+        case .live:
+            guard appState.isOwnExtraShowing(key) else {
+                PelmetLog.log("press: \(key.rawValue) — not live, nothing to open, \(ms())ms")
+                return
+            }
+        case .onBar:
+            if !appState.isOwnExtraShowing(key) {
+                guard !appState.applying else {
+                    PelmetLog.log("press: \(key.rawValue) refused — an Apply pass has the bar")
+                    return
+                }
+                appState.showItemInBar(key)
+                let by = Date().addingTimeInterval(AppTiming.pressTransitionWait)
+                while appState.isTransitioning, Date() < by, !run.yielded {
+                    try? await Task.sleep(for: .milliseconds(30))
+                }
+                await appState.waitUntilQuiesced(interval: 0.15, deadline: 2, poll: .milliseconds(30))
+                guard !run.yielded else {
+                    PelmetLog.log("press: \(key.rawValue) — superseded before it started, \(ms())ms")
+                    return
+                }
+            }
+        }
+        // An item that stayed out of the bar (its rule keeps it hidden) pops
+        // its menu at the pointer.
+        let anchored = need != .onBar || appState.isOwnExtraShowing(key)
+        PelmetLog.log("press: \(key.rawValue) (\(secondary ? "secondary" : "primary")) own action at \(ms())ms\(anchored ? "" : ", not on the bar: menu at the pointer")")
+        let ran = appState.activateExtra(key, secondary: secondary)
+        PelmetLog.log("press: \(key.rawValue) own action \(ran ? "returned" : "not found") at \(ms())ms")
     }
 
     /// Hold the item revealed until what the click showed is undone: the
