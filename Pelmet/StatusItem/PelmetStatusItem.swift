@@ -184,7 +184,23 @@ final class PelmetStatusItem {
         )
         let target = AppMenuTarget.shared
         target.appState = appState
-        var items: [NSMenuItem] = [toggle, showAll, .separator(), settings, .separator(), quit]
+        // The style is a taste call people flip while watching the bar, so
+        // it sits one hover away instead of two clicks into Behavior.
+        let animation = NSMenuItem(title: String(localized: "Animation"), action: nil, keyEquivalent: "")
+        let styles = NSMenu()
+        for (style, title) in [
+            (RevealAnimation.instant, String(localized: "Instant")),
+            (.smooth, String(localized: "Smooth")),
+            (.fade, String(localized: "Fade")),
+        ] {
+            let option = NSMenuItem(title: title, action: #selector(AppMenuTarget.setAnimation(_:)), keyEquivalent: "")
+            option.representedObject = style.rawValue
+            option.state = appState.settings.revealAnimation == style ? .on : .off
+            option.target = target
+            styles.addItem(option)
+        }
+        animation.submenu = styles
+        var items: [NSMenuItem] = [toggle, showAll, .separator(), animation, settings, .separator(), quit]
         // Same line in every right-click (chevron, separators, empty bar),
         // right under Settings: the About chip is the only other trace once
         // the banner is gone.
@@ -224,6 +240,13 @@ final class AppMenuTarget: NSObject {
     @objc func toggle() { appState?.toggle(reason: .statusItem) }
     @objc func showAll() { appState?.reveal([.hidden, .alwaysHidden], reason: .statusItem) }
     @objc func openSettings() { appState?.openSettings() }
+    @objc func setAnimation(_ sender: NSMenuItem) {
+        guard let appState,
+              let raw = sender.representedObject as? String,
+              let style = RevealAnimation(rawValue: raw) else { return }
+        appState.settings.revealAnimation = style
+        appState.settingsChanged()
+    }
     @objc func grantAccessibility() { AccessibilityAccess.request() }
     /// The About pane is the update hub (chip, notes, toggles) — land there
     /// rather than straight in Sparkle's window.
