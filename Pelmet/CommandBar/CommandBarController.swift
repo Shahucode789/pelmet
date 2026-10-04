@@ -492,10 +492,9 @@ final class CommandBarController {
 
     private func chooseResult(index: Int, modifiers: NSEvent.ModifierFlags) {
         guard let appState, let entry = entries[model.rows[index].id] else { return }
-        // ⌘ and ⌥ change what a press of an item does; nothing else has a
-        // second meaning, so a modified Return on it is not a Return.
-        let modified = modifiers.contains(.command) || modifiers.contains(.option)
-        if modified, !entry.isItem { return }
+        // ⌘ changes what a press of an item does; nothing else has a second
+        // meaning, so ⌘↩ on it is not a Return.
+        if modifiers.contains(.command), !entry.isItem { return }
         commit(entry, modifiers: modifiers, query: model.query, row: index, of: model.rows.count, appState: appState)
     }
 
@@ -506,7 +505,7 @@ final class CommandBarController {
     ) {
         history.record(id: entry.candidate.id, query: query, at: .now)
         saveHistory()
-        let how = modifiers.contains(.command) ? "⌘↩" : modifiers.contains(.option) ? "⌥↩" : "↩"
+        let how = modifiers.contains(.command) ? "⌘↩" : "↩"
         let place = row.map { ", row \($0 + 1) of \(count ?? 0)" } ?? ""
         PelmetLog.log("search: chose \(entry.candidate.id) (\(entry.candidate.kind.rawValue)\(place)) with \(how) — \(Self.describe(entry.action, modifiers: modifiers))")
         close(reason: "chose")
@@ -516,7 +515,7 @@ final class CommandBarController {
     private static func describe(_ action: CommandBarEntry.Action, modifiers: NSEvent.ModifierFlags) -> String {
         switch action {
         case .item:
-            modifiers.contains(.command) ? "show in bar" : modifiers.contains(.option) ? "open menu (secondary)" : "open menu"
+            modifiers.contains(.command) ? "show in bar" : "open menu"
         case .launcher: "open the app"
         case .command(let command): "command \(command.key)"
         case .setting(let tab, let row): "settings tab \(tab.rawValue), row \(row)"
@@ -528,8 +527,6 @@ final class CommandBarController {
         case .item(let id):
             if modifiers.contains(.command) {
                 appState.showItemInBar(id)
-            } else if modifiers.contains(.option) {
-                appState.openItemMenu(id, button: .secondary)
             } else {
                 appState.openItemMenu(id)
             }
@@ -654,21 +651,19 @@ final class CommandBarController {
         // The keys on the rows work from anywhere in the list.
         if modifiers.contains(.command) {
             chosen = actionItems.contains { $0.action == .showInBar } ? .showInBar : nil
-        } else if modifiers.contains(.option) {
-            chosen = actionItems.contains { $0.action == .rightClick } ? .rightClick : nil
         }
         guard let chosen else { return }
         PelmetLog.log("search: action \(chosen.key) on \(entry.candidate.id)")
 
         switch (chosen, entry.action) {
-        case (.openMenu, .item), (.showInBar, .item), (.rightClick, .item):
-            let how: NSEvent.ModifierFlags = chosen == .showInBar ? .command : chosen == .rightClick ? .option : []
+        case (.openMenu, .item), (.showInBar, .item):
+            let how: NSEvent.ModifierFlags = chosen == .showInBar ? .command : []
             commit(entry, modifiers: how, query: resultsQuery, row: nil, of: nil, appState: appState)
         case (.openLauncher, .launcher):
             commit(entry, modifiers: [], query: resultsQuery, row: nil, of: nil, appState: appState)
         case (.move(let section), .item(let id)):
             close(reason: "moved")
-            appState.moveItem(id, to: section, before: nil)
+            appState.moveItemNow(id, to: section)
         case (.setShortcut, .item):
             beginInput(.shortcut, title: model.rows[index].title)
         case (.removeShortcut, .item(let id)):

@@ -8,7 +8,7 @@ import AppKit
 import PelmetCore
 
 enum CommandBarAction: Equatable {
-    case openMenu, showInBar, rightClick
+    case openMenu, showInBar
     case move(PelmetCore.Section)
     case setShortcut, removeShortcut
     case setAlias
@@ -22,7 +22,6 @@ enum CommandBarAction: Equatable {
         switch self {
         case .openMenu: "openMenu"
         case .showInBar: "showInBar"
-        case .rightClick: "rightClick"
         case .move(let section): "move.\(section.rawValue)"
         case .setShortcut: "setShortcut"
         case .removeShortcut: "removeShortcut"
@@ -64,7 +63,6 @@ enum CommandBarActions {
             var out = [
                 item(.openMenu, String(localized: "Open Menu"), "cursorarrow.click", "↩"),
                 item(.showInBar, String(localized: "Show in Menu Bar"), "eye", "⌘↩"),
-                item(.rightClick, String(localized: "Right-Click"), pick("cursorarrow.click.2", "cursorarrow.click"), "⌥↩"),
             ]
             // The clock and Control Center stay where macOS pins them.
             if !appState.isImmovable(id) {

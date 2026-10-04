@@ -34,7 +34,6 @@ Hidden icons are out of sight by design, so reaching one costs a reveal, a hunt 
 |---|---|
 | ↩ | Open the item's menu |
 | ⌘↩ | Show it in the bar without clicking (reveals its section) |
-| ⌥↩ | Secondary click, for items with a right-click menu |
 | ⌘K | Actions for the selected row ("Actions", below); again or ⎋ goes back |
 | ⌘, | Settings |
 | ⎋ or the shortcut again | Close, focus returns to the previous app |
@@ -47,7 +46,7 @@ Hidden icons are out of sight by design, so reaching one costs a reveal, a hunt 
 
 ⌘K on an item row swaps the results for that row's actions in the same panel. The field wears a quiet chip with the item's glyph and name ("Wi-Fi ›", low-alpha fill, no border) and typing filters the actions with `FuzzyMatcher`. ⎋ or ⌘K returns to the results with the query and the selected row restored. Commands and settings have no actions, ⌘K does nothing there.
 
-Actions, in order, with the keys that also work from anywhere in the list shown in tertiary ink: Open Menu ↩, Show in Menu Bar ⌘↩, Right-Click ⌥↩, Move to Visible / Hidden / Always Hidden (the current section is left out, and so is every move for the clock and Control Center, which macOS pins), Set Shortcut… or Change Shortcut… (the current one trailing) and Remove Shortcut, Add Alias… or Edit Alias… (the current one trailing), Open and Quit for third-party apps (Quit is `NSRunningApplication.terminate`, only while it runs), Forget. A not-running launcher has Open and Forget. Forget only shows when there is a pick to drop.
+Actions, in order, with the keys that also work from anywhere in the list shown in tertiary ink: Open Menu ↩, Show in Menu Bar ⌘↩, Move to Visible / Hidden / Always Hidden (the current section is left out, and so is every move for the clock and Control Center, which macOS pins; a move lands at the chevron side of its section and is applied at once unless the editor holds other unapplied edits), Set Shortcut… or Change Shortcut… (the current one trailing) and Remove Shortcut, Add Alias… or Edit Alias… (the current one trailing), Open and Quit for third-party apps (Quit is `NSRunningApplication.terminate`, only while it runs), Forget. A not-running launcher has Open and Forget. Forget only shows when there is a pick to drop.
 
 - **Move** calls `AppState.moveItem(_:to:before: nil)`, the editor's drop between sections. Membership (`sectionModel.assignments`) changes and `engine.setModel` converges the assertion at once, so the icon hides or shows now; only its drawn position waits for Apply, like any between-section drop (the Menu Bar tab shows the pending change).
 - **Set Shortcut** is an inline row that records at once (⎋ cancels). A combination is refused, with the reason and what to do in the row, when it is one of Pelmet's own shortcuts, another item's, macOS's (`SystemShortcuts.owns`), or taken by another app (`RegisterEventHotKey` said no). It stays in the recording row so the next try is one keystroke.

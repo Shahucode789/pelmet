@@ -105,7 +105,7 @@ struct CommandBarView: View {
     let model: CommandBarModel
     let onQueryChange: (String) -> Void
     /// A row picked by click; the modifiers are the click's (⌘ = show in
-    /// the bar, ⌥ = secondary click, as with Return).
+    /// the bar, as with Return).
     let onChoose: (Int, NSEvent.ModifierFlags) -> Void
 
     var body: some View {
@@ -196,9 +196,7 @@ struct CommandBarView: View {
     private var list: some View {
         ScrollViewReader { proxy in
             ScrollView(.vertical) {
-                // Lazy: the first keystroke swaps 5 rest rows for up to 20
-                // results, and the panel's resize lays them out on the spot
-                // (37–101ms eager, measured 2026-10-04). Only the 8 in view draw.
+                // Lazy: up to 20 results, only the 8 in view draw.
                 LazyVStack(spacing: 0) {
                     ForEach(Array(model.rows.enumerated()), id: \.element.id) { index, row in
                         CommandBarRowView(row: row, selected: index == model.selected) {

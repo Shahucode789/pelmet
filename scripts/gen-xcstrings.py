@@ -582,7 +582,6 @@ T = {
     # ── Command bar actions, shortcuts, aliases (2026-10-04) ─────────
     "Open Menu": dict(de="Menü öffnen", fr="Ouvrir le menu", es="Abrir menú", it="Apri menu", pt="Abrir menu", ja="メニューを開く", zh="打开菜单", ko="메뉴 열기", ru="Открыть меню"),
     "Show in Menu Bar": dict(de="In der Menüleiste zeigen", fr="Afficher dans la barre des menus", es="Mostrar en la barra de menús", it="Mostra nella barra dei menu", pt="Mostrar na barra de menus", ja="メニューバーに表示", zh="在菜单栏中显示", ko="메뉴 막대에 표시", ru="Показать в строке меню"),
-    "Right-Click": dict(de="Rechtsklick", fr="Clic droit", es="Clic derecho", it="Clic destro", pt="Clique com o botão direito", ja="右クリック", zh="右键点击", ko="오른쪽 클릭", ru="Правый клик"),
     "Move to Visible": dict(de="Nach „Sichtbar“ verschieben", fr="Déplacer vers Visibles", es="Mover a Visibles", it="Sposta in Visibili", pt="Mover para Visíveis", ja="「表示」へ移動", zh="移到“可见”", ko="‘표시’로 이동", ru="Переместить в «Видимые»"),
     "Move to Hidden": dict(de="Nach „Ausgeblendet“ verschieben", fr="Déplacer vers Masqués", es="Mover a Ocultos", it="Sposta in Nascosti", pt="Mover para Ocultos", ja="「非表示」へ移動", zh="移到“隐藏”", ko="‘숨김’으로 이동", ru="Переместить в «Скрытые»"),
     "Move to Always Hidden": dict(de="Nach „Immer ausgeblendet“ verschieben", fr="Déplacer vers Toujours masqués", es="Mover a Siempre ocultos", it="Sposta in Sempre nascosti", pt="Mover para Sempre ocultos", ja="「常に非表示」へ移動", zh="移到“始终隐藏”", ko="‘항상 숨김’으로 이동", ru="Переместить в «Всегда скрытые»"),

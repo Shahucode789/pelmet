@@ -1576,6 +1576,22 @@ final class AppState {
         twin.setShown(true)
     }
 
+    /// A move asked for outside the editor (the command bar). Membership
+    /// alone leaves the icon where it sits, left of the chevron for a newly
+    /// visible one (2026-10-04), so it is drawn at the chevron side of its
+    /// new section and applied at once. Edits the editor already holds stay
+    /// the person's to apply: then the move only joins them.
+    func moveItemNow(_ id: ItemID, to section: PelmetCore.Section) {
+        let othersPending = applyPending
+        let before = section == .visible ? editorItems(in: .visible).first { $0.id != id }?.id : nil
+        moveItem(id, to: section, before: before)
+        guard !othersPending else {
+            PelmetLog.log("editor: move of \(id.rawValue) joins pending edits, not applied")
+            return
+        }
+        applyOrderEdits()
+    }
+
     func moveItem(_ id: ItemID, to section: PelmetCore.Section, before beforeID: ItemID?) {
         // A drop that lands while a pass runs would be cleared with the
         // pass's own edits on success; the editor is inert meanwhile, this
