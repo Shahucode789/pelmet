@@ -86,7 +86,7 @@ from its real icon, hidden or not. The arrow keys work in the menu like they
 normally do. Search knows the short names people type (bt, wifi) and puts the
 icons you open most first. It finds Pelmet's settings too, and ⌘K on a result
 moves it to another section or gives it its own shortcut. What it learns
-stays on your Mac. It's in the beta now (0.3.1-beta.5).
+stays on your Mac. New in 0.3.1.
 
 <p align="center">
   <img src="https://pelmet.fif7y.com/assets/search.gif" alt="Pelmet Search: ⌥⌘K opens a search panel under the menu bar, typing bt finds Bluetooth, Return opens Bluetooth's menu from its own icon and the arrow keys move down it" width="640"><br>
