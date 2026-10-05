@@ -145,12 +145,14 @@ two. Turning it off keeps you on your current build until the next stable
 passes it.
 
 **Is there a keyboard shortcut?**
-Two, and they work from any app. ⌥⌘, shows the hidden icons and puts them
+A few, and they work from any app. ⌥⌘, shows the hidden icons and puts them
 back on the next press (with auto-rehide set to Instant, they also go back
-once the pointer leaves the bar or you click elsewhere). ⇧⌥⌘, opens Pelmet
-Settings, so it's the way in when the Pelmet icon is off. Change either one
+once the pointer leaves the bar or you click elsewhere). ⌃⌥⌘, does the same
+with the always-hidden ones too. ⌥⌘K opens Pelmet Search. ⇧⌥⌘, opens Pelmet
+Settings, so it's the way in when the Pelmet icon is off. Change any of them
 in Settings → General: click the shortcut, press the new keys. The × next to
-a custom shortcut, or ⌫ while recording, brings the default back.
+a custom shortcut, or ⌫ while recording, brings the default back. ⌥⌘N opens
+Notification Center and lives in Settings → Behavior, under the clock setting.
 
 **How do I open Settings if I turned the Pelmet icon off?**
 Any of: press ⇧⌥⌘, (or the shortcut you recorded), right-click a Pelmet
@@ -165,9 +167,10 @@ still opens the menu, and the shortcut still works. The switch is locked on
 while the Pelmet icon is hidden, because then it is the way back to Settings.
 
 **Can I change the Pelmet icon?**
-Settings → General → Icon. Six styles: chevron, arrow, eye, dots, grid and
-panel. Chevron, arrow, eye and panel flip to a revealed face while the bar is
-open, so the icon keeps pointing at what a click will do.
+Settings → General → Icon. Seven styles: chevron, arrow, eye, dots, grid,
+panel and dot. Chevron, arrow, eye and panel flip to a revealed face while the
+bar is open, so the icon keeps pointing at what a click will do. The dot is
+filled while the icons are hidden and an outline while they're shown.
 
 **How short can the hover delay be?**
 0.1 to 0.5 seconds, in 0.1 steps. Auto-rehide runs from instant to 5 seconds
