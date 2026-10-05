@@ -1330,7 +1330,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "辅助功能"
+            "value": "无障碍"
           }
         }
       }
@@ -1388,7 +1388,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "辅助功能访问已关闭。开启…"
+            "value": "无障碍访问已关闭。开启…"
           }
         }
       }
@@ -1446,7 +1446,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "辅助功能是 Pelmet 识别并移动图标的方式，数据不会离开你的 Mac。屏幕录制是可选的：它让 Pelmet 的动画样式覆盖在 macOS 显示和隐藏图标的方式之上。不会录制或保存任何内容。"
+            "value": "无障碍权限是 Pelmet 识别并移动图标的方式，数据不会离开你的 Mac。录屏是可选的：它让 Pelmet 的动画样式覆盖在 macOS 显示和隐藏图标的方式之上。不会录制或保存任何内容。"
           }
         }
       }
@@ -2200,7 +2200,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一键打开 AirDrop。"
+            "value": "一键打开隔空投送。"
           }
         }
       }
@@ -2258,7 +2258,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "允许屏幕录制"
+            "value": "允许录屏"
           }
         }
       }
@@ -3330,7 +3330,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Esegui backup adesso"
+            "value": "Esegui il backup adesso"
           }
         },
         "ja": {
@@ -5168,25 +5168,25 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ausblenden"
+            "value": "Schließen"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Descartar"
+            "value": "Cerrar"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ignorer"
+            "value": "Fermer"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ignora"
+            "value": "Chiudi"
           }
         },
         "ja": {
@@ -5204,7 +5204,7 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dispensar"
+            "value": "Descartar"
           }
         },
         "ru": {
@@ -6108,7 +6108,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Changement rapide d’utilisateur"
+            "value": "Permutation d’utilisateur"
           }
         },
         "it": {
@@ -6328,25 +6328,25 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Fokus-Einstellungen …"
+            "value": "Fokuseinstellungen …"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ajustes de concentración…"
+            "value": "Ajustes de modos de concentración…"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Réglages de Concentration…"
+            "value": "Réglages Concentration…"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Impostazioni Full immersion…"
+            "value": "Impostazioni “Full immersion”…"
           }
         },
         "ja": {
@@ -6966,13 +6966,13 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dauerhaft weg, außer bei Doppelklick oder ⌥-Klick auf das Chevron"
+            "value": "Dauerhaft weg, außer bei Doppelklick oder ⌥-Klick auf den Chevron"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ocultos del todo, salvo con doble clic o ⌥-clic en el chevron"
+            "value": "Ocultos del todo, salvo con doble clic o ⌥-clic en el chevrón"
           }
         },
         "fr": {
@@ -7014,7 +7014,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "彻底隐藏，除非双击或 ⌥-点击 V 形符号"
+            "value": "彻底隐藏，除非双击或 ⌥-点击尖角符号"
           }
         }
       }
@@ -7072,7 +7072,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "授予辅助功能权限"
+            "value": "授予无障碍权限"
           }
         }
       }
@@ -8464,7 +8464,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "随时知道摄像头、麦克风或同播共享是否开启。没有屏幕录制权限时，点击它会让隐藏的图标闪现一下。"
+            "value": "随时知道摄像头、麦克风或同播共享是否开启。没有录屏权限时，点击它会让隐藏的图标闪现一下。"
           }
         }
       }
@@ -8996,7 +8996,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Anmeldefenster…"
+            "value": "Anmeldefenster …"
           }
         },
         "es": {
@@ -9008,7 +9008,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Fenêtre de connexion…"
+            "value": "Fenêtre d’ouverture de session…"
           }
         },
         "it": {
@@ -9032,7 +9032,7 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Janela de login…"
+            "value": "Janela de Início de Sessão…"
           }
         },
         "ru": {
@@ -9392,7 +9392,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "让菜单栏与编辑器一致：按你的顺序，并把每个图标放到箭头上其分区所在的一侧。每个图标在隐藏光标的情况下只拖动一次；按下之前不会移动任何内容。"
+            "value": "让菜单栏与编辑器一致：按你的顺序，并把每个图标放到尖角符号上其分区所在的一侧。每个图标在隐藏光标的情况下只拖动一次；按下之前不会移动任何内容。"
           }
         }
       }
@@ -10030,7 +10030,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "尚未就位——它随此分区隐藏，但在应用之前仍位于箭头另一侧"
+            "value": "尚未就位——它随此分区隐藏，但在应用之前仍位于尖角符号另一侧"
           }
         }
       }
@@ -10174,7 +10174,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ancora niente da azzerare. Pelmet impara dalle icone che apri con la ricerca."
+            "value": "Ancora niente da ripristinare. Pelmet impara dalle icone che apri con la ricerca."
           }
         },
         "ja": {
@@ -10320,7 +10320,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "即使图标已隐藏，点击时钟仍能打开通知中心。Pelmet 会处理这次点击；没有屏幕录制权限时，隐藏的图标会闪现一下。关闭后，从触控板右边缘双指轻扫仍然有效。"
+            "value": "即使图标已隐藏，点击时钟仍能打开通知中心。Pelmet 会处理这次点击；没有录屏权限时，隐藏的图标会闪现一下。关闭后，从触控板右边缘双指轻扫仍然有效。"
           }
         }
       }
@@ -10968,19 +10968,19 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Time Machine-Einstellungen öffnen …"
+            "value": "Time Machine-Einstellungen öffnen …"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Abrir los ajustes de Time Machine…"
+            "value": "Abrir los ajustes de Time Machine…"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ouvrir les réglages Time Machine…"
+            "value": "Ouvrir les réglages Time Machine…"
           }
         },
         "it": {
@@ -10998,7 +10998,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Time Machine 설정 열기…"
+            "value": "Time Machine 설정 열기…"
           }
         },
         "pt-BR": {
@@ -11010,7 +11010,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Открыть настройки Time Machine…"
+            "value": "Открыть настройки Time Machine…"
           }
         },
         "zh-Hans": {
@@ -11258,7 +11258,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Anhalten"
+            "value": "Pause"
           }
         },
         "es": {
@@ -12998,7 +12998,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pelmet wird zum Übernehmen neu gestartet."
+            "value": "Pelmet wird neu gestartet, um die Änderung anzuwenden."
           }
         },
         "es": {
@@ -13422,7 +13422,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Azzera cronologia di ricerca"
+            "value": "Ripristina cronologia di ricerca"
           }
         },
         "ja": {
@@ -13520,7 +13520,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Fortsetzen"
+            "value": "Weiter"
           }
         },
         "es": {
@@ -13562,7 +13562,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Продолжить"
+            "value": "Возобновить"
           }
         },
         "zh-Hans": {
@@ -14032,7 +14032,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "屏幕录制"
+            "value": "录屏"
           }
         }
       }
@@ -14090,7 +14090,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "屏幕录制已开启"
+            "value": "录屏已开启"
           }
         }
       }
@@ -14316,7 +14316,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Видите, какой фокус включён, и переключаете его одним щелчком."
+            "value": "Видите, какой режим фокусирования включён, и переключаете его одним щелчком."
           }
         },
         "zh-Hans": {
@@ -14762,7 +14762,7 @@
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "隠した項目を表示"
+            "value": "「非表示」の項目を表示"
           }
         },
         "ko": {
@@ -18218,13 +18218,13 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Einstellungen „Benutzer & Gruppen“…"
+            "value": "Einstellungen „Benutzer:innen & Gruppen“ …"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ajustes de Usuarios y grupos…"
+            "value": "Ajustes de usuarios y grupos…"
           }
         },
         "fr": {
@@ -18236,13 +18236,13 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Impostazioni Utenti e gruppi…"
+            "value": "Impostazioni “Utenti e gruppi”…"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "「ユーザとグループ」設定…"
+            "value": "“ユーザとグループ”設定…"
           }
         },
         "ko": {
@@ -18260,13 +18260,13 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Настройки «Пользователи и группы»…"
+            "value": "Настройки пользователей и групп…"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "“用户与群组”设置…"
+            "value": "用户与群组设置…"
           }
         }
       }
@@ -19310,7 +19310,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "macOS 移除了 Pelmet 的辅助功能权限，这在某些更新和重新安装后会发生。重新授予后，一切会从上次的状态继续。"
+            "value": "macOS 移除了 Pelmet 的无障碍权限，这在某些更新和重新安装后会发生。重新授予后，一切会从上次的状态继续。"
           }
         }
       }
