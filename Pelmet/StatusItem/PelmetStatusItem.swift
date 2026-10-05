@@ -4,6 +4,7 @@
 // right-click or imperative button control.
 
 import AppKit
+import Carbon.HIToolbox
 import PelmetCore
 import PelmetEngine
 
@@ -48,6 +49,9 @@ final class PelmetStatusItem {
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             // Stable engine identity (chevron-boundary lookups key off this).
             button.setAccessibilityTitle("Pelmet.StatusItem")
+            // The one item of ours that is always drawn: the bar's ink is
+            // read off it for the apps whose icons we hide.
+            MenuBarInkBroadcast.shared.track(button)
         }
         warning = !appState.accessibilityGranted
         applyImage()
@@ -107,17 +111,20 @@ final class PelmetStatusItem {
         // The style is only a preference — losing the weak appState is not a
         // reason to show nothing.
         let style = appState?.settings.statusIconStyle ?? .chevron
-        let glyph = NSImage(
+        let symbol = NSImage(
             systemSymbolName: style.symbol(revealed: revealedFace),
             accessibilityDescription: "Pelmet"
         )
+        // One configuration, applied once: a second withSymbolConfiguration
+        // replaces the first, so the warning palette would drop the size.
+        let size = style.symbolPointSize.map { NSImage.SymbolConfiguration(pointSize: $0, weight: .regular) }
+        let glyph = size.flatMap { symbol?.withSymbolConfiguration($0) } ?? symbol
         guard warning else {
             item.button?.image = glyph
             return
         }
-        let tinted = glyph?.withSymbolConfiguration(
-            NSImage.SymbolConfiguration(paletteColors: [.systemOrange])
-        )
+        let palette = NSImage.SymbolConfiguration(paletteColors: [.systemOrange])
+        let tinted = symbol?.withSymbolConfiguration(size.map { $0.applying(palette) } ?? palette)
         tinted?.isTemplate = false
         item.button?.image = tinted ?? glyph
     }
@@ -127,6 +134,7 @@ final class PelmetStatusItem {
     func remove() {
         removed = true
         removalObservation = nil
+        MenuBarInkBroadcast.shared.stop()
         NSStatusBar.system.removeStatusItem(item)
     }
 
@@ -165,6 +173,11 @@ final class PelmetStatusItem {
             title: String(localized: "Show Always-Hidden Too"),
             action: #selector(AppMenuTarget.showAll), keyEquivalent: ""
         )
+        let search = NSMenuItem(
+            title: String(localized: "Search…"),
+            action: #selector(AppMenuTarget.search), keyEquivalent: ""
+        )
+        Self.showShortcut(appState.settings.searchHotkey, on: search)
         let settings = NSMenuItem(
             title: String(localized: "Pelmet Settings…"),
             // No key equivalent: it only fires while this menu is open, and read
@@ -177,7 +190,23 @@ final class PelmetStatusItem {
         )
         let target = AppMenuTarget.shared
         target.appState = appState
-        var items: [NSMenuItem] = [toggle, showAll, .separator(), settings, .separator(), quit]
+        // The style is a taste call people flip while watching the bar, so
+        // it sits one hover away instead of two clicks into Behavior.
+        let animation = NSMenuItem(title: String(localized: "Animation"), action: nil, keyEquivalent: "")
+        let styles = NSMenu()
+        for (style, title) in [
+            (RevealAnimation.instant, String(localized: "Instant")),
+            (.smooth, String(localized: "Smooth")),
+            (.fade, String(localized: "Fade")),
+        ] {
+            let option = NSMenuItem(title: title, action: #selector(AppMenuTarget.setAnimation(_:)), keyEquivalent: "")
+            option.representedObject = style.rawValue
+            option.state = appState.settings.revealAnimation == style ? .on : .off
+            option.target = target
+            styles.addItem(option)
+        }
+        animation.submenu = styles
+        var items: [NSMenuItem] = [toggle, showAll, .separator(), animation, search, settings, .separator(), quit]
         // Same line in every right-click (chevron, separators, empty bar),
         // right under Settings: the About chip is the only other trace once
         // the banner is gone.
@@ -206,6 +235,24 @@ final class PelmetStatusItem {
         menu.items = items
         return menu
     }
+
+    /// Draw a global shortcut beside its menu item. It is a real one (the
+    /// same combination works with this menu closed), so unlike Settings it
+    /// reads true. Only a single-character key can be drawn as a key
+    /// equivalent; the arrows and F-keys are left off.
+    private static func showShortcut(_ spec: HotkeySpec?, on item: NSMenuItem) {
+        guard let spec else { return }
+        let modifierGlyphs: Set<Character> = ["⌃", "⌥", "⇧", "⌘"]
+        let keys = spec.display.filter { !modifierGlyphs.contains($0) }
+        guard keys.count == 1 else { return }
+        var mask: NSEvent.ModifierFlags = []
+        if spec.modifiers & UInt32(controlKey) != 0 { mask.insert(.control) }
+        if spec.modifiers & UInt32(optionKey) != 0 { mask.insert(.option) }
+        if spec.modifiers & UInt32(shiftKey) != 0 { mask.insert(.shift) }
+        if spec.modifiers & UInt32(cmdKey) != 0 { mask.insert(.command) }
+        item.keyEquivalent = keys.lowercased()
+        item.keyEquivalentModifierMask = mask
+    }
 }
 
 /// Shared menu target so context menus built from separators and the status
@@ -216,7 +263,15 @@ final class AppMenuTarget: NSObject {
 
     @objc func toggle() { appState?.toggle(reason: .statusItem) }
     @objc func showAll() { appState?.reveal([.hidden, .alwaysHidden], reason: .statusItem) }
+    @objc func search() { appState?.commandBar.open(source: "menu") }
     @objc func openSettings() { appState?.openSettings() }
+    @objc func setAnimation(_ sender: NSMenuItem) {
+        guard let appState,
+              let raw = sender.representedObject as? String,
+              let style = RevealAnimation(rawValue: raw) else { return }
+        appState.settings.revealAnimation = style
+        appState.settingsChanged()
+    }
     @objc func grantAccessibility() { AccessibilityAccess.request() }
     /// The About pane is the update hub (chip, notes, toggles) — land there
     /// rather than straight in Sparkle's window.

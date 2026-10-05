@@ -63,14 +63,31 @@ public actor AgentBarEngine: MenuBarEngine {
         reflowCompanion = companion
     }
 
+    /// An item-only reveal (and the release that ends it) changes no
+    /// section: the extras have nothing to reflow, and applying them for
+    /// "nothing revealed" ghost-hid an extra that its own rule re-showed a
+    /// beat later (Siri blinking on every press, 2026-09-21). The mute only
+    /// holds while the sections are the ones the companion last got: a hover
+    /// that reveals one meanwhile is a real change and fires it.
+    private var companionMuted = false
+    private var companionSections: Set<Section>?
+
     private func notifyReflowCompanion() {
         guard let reflowCompanion else { return }
         let revealed = revealedSections
+        if companionMuted, companionSections == revealed { return }
+        companionSections = revealed
         Task { @MainActor in reflowCompanion(revealed) }
     }
 
     private var model = SectionModel()
     private var revealedSections: Set<Section> = []
+    /// Items revealed on their own, sections untouched (a press brings one
+    /// icon back beneath a cover). Owned by the press that revealed them:
+    /// `conceal()` leaves them, so a rehide that lands mid-press cannot pull
+    /// an item out from under the menu it opened. Released by
+    /// `conceal(items:)`.
+    private var revealedItems: Set<ItemID> = []
     /// Steady-assertion mode: hold an assertion even when nothing is
     /// concealable (allowlist = every observed bundle). Keeps macOS's
     /// collateral-hidden extras (Now Playing, camera pill, AirDrop, Focus)
@@ -165,9 +182,30 @@ public actor AgentBarEngine: MenuBarEngine {
         await converge()
     }
 
+    /// Reveal these items only: their bundles leave the concealable set,
+    /// every section stays as it is, nothing else reflows.
+    public func reveal(items: Set<ItemID>) async {
+        revealedItems.formUnion(items)
+        companionMuted = true
+        await converge()
+        companionMuted = false
+    }
+
+    /// Put these items back after an item-only reveal. Sections revealed
+    /// meanwhile (a hover) stay as they are.
+    public func conceal(items: Set<ItemID>) async {
+        revealedItems.subtract(items)
+        companionMuted = true
+        await converge()
+        companionMuted = false
+    }
+
     public func conceal() async {
+        // Nothing revealed but items: no section changes, the extras stay.
+        companionMuted = revealedSections.isEmpty && !revealedItems.isEmpty
         revealedSections = []
         await converge()
+        companionMuted = false
     }
 
     /// Bundle ids of the running applications, pushed by the app from its
@@ -342,6 +380,7 @@ public actor AgentBarEngine: MenuBarEngine {
             carriedConcealed: lastSnapshot?.concealed ?? [],
             runningBundles: runningBundles,
             revealedSections: revealedSections,
+            revealedItems: revealedItems,
             steadyExtras: steadyExtras,
             exemptBundles: Self.identityExemptBundles
         )
@@ -634,11 +673,11 @@ public actor AgentBarEngine: MenuBarEngine {
     /// this returns, and the invalidate XPC is already queued ahead of it.
     /// Bumps the converge epoch so an in-flight converge can't re-assert
     /// between the drop and the click.
-    public func beginClockBlink() -> Bool {
+    public func beginClockBlink(label: String = "clock") -> Bool {
         guard assertion != nil else { return false }
         convergeEpoch += 1
         invalidateAssertion()
-        PelmetLog.log("clock: blink — assertion dropped for the click")
+        PelmetLog.log("\(label): blink — assertion dropped for the click")
         return true
     }
 

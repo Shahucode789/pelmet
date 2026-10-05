@@ -51,6 +51,24 @@ public enum FocusLogParser {
         )
     }
 
+    /// Whether a `Calculate DND state for snapshot` message says no Focus is
+    /// on (an empty `activeAssertionUUIDs` list). donotdisturbd recomputes
+    /// that list on every change, including the ones it never announces with
+    /// a state update: a location Focus that ended on the iPhone while the
+    /// Mac slept came back at wake as an empty list and nothing else (#70).
+    /// A list that still names an assertion says nothing about which mode,
+    /// so it reads false and the state update stays in charge.
+    public static func snapshotSaysOff(_ message: String) -> Bool {
+        guard message.hasPrefix(snapshotPrefix),
+              let open = message.range(of: "activeAssertionUUIDs=("),
+              let close = message[open.upperBound...].firstIndex(of: ")")
+        else { return false }
+        return message[open.upperBound..<close].allSatisfy(\.isWhitespace)
+    }
+
+    /// The start of donotdisturbd's snapshot message, for predicates.
+    public static let snapshotPrefix = "Calculate DND state for snapshot"
+
     /// `key: value;` in the `<DNDMode …>` description style, the value
     /// ending at the field separator or the object's closing bracket.
     private static func value(after key: String, in text: Substring) -> String? {

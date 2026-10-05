@@ -25,6 +25,9 @@ enum AppTiming {
     /// Longest the blink cover waits for the concealed items to leave the
     /// AX tree after the re-acquire before lifting anyway.
     static let clockBlinkCoverDeadline: TimeInterval = 1.5
+    /// Camera & mic relay (#68): longest Apple's pill may take to rejoin
+    /// the AX tree after the drop before the relay gives up on it.
+    static let audioVideoPillWait: TimeInterval = 1
     /// Notification Center's panel slides in over ~100ms from Pelmet's
     /// press; the blink cover crossfades from the bare still to the
     /// under-panel one over that slide, starting at the press.
@@ -71,6 +74,9 @@ enum AppTiming {
     /// How long a reveal waits for a cover retake still in flight (#49):
     /// a capture runs ~90ms here, up to ~470ms on a four-display Mac.
     static let coverRetakeWait: TimeInterval = 0.6
+    /// How long a transition waits for the previous one's pictures to lift
+    /// (#61): a lift lands 560–680ms after its click, measured 2026-09-24.
+    static let previousLiftWait: TimeInterval = 0.8
     /// Backdrop check delay after an animated window move (tiling key,
     /// activation, Space switch): a Space switch animates ~0.5s. A mouse-up
     /// is checked at once — the window is already where the drag left it.
@@ -102,6 +108,8 @@ enum AppTiming {
     static let tidyRevealWait: Duration = .seconds(1.2)
     /// An own extra entering the bar is hosted before its one-item pass.
     static let newExtraPlacementDelay: Duration = .milliseconds(600)
+    /// The second pass for an own item the first one found not laid out.
+    static let ownItemRetryDelay: Duration = .milliseconds(1500)
     /// The boot own-item passes wait this long after the own items were
     /// adopted: 235ms after adoption the bar is still attaching (frames
     /// overlap, the chevron reads as trapped) and the pass planned on it —
@@ -161,4 +169,42 @@ enum AppTiming {
     /// « expansion → re-measure: the trapped items reflow in left of the
     /// notch and the visible run shifts (~38pt) before frames are true.
     static let overflowExpandSettle: Duration = .milliseconds(700)
+
+    /// Item press (ItemPress): how long a click gets to show a menu or
+    /// panel before the item goes back, and how long an open one keeps the
+    /// item revealed beneath the cover.
+    static let pressMenuWait: TimeInterval = 3
+    static let pressMenuCap: TimeInterval = 60
+    /// When the only sign the press showed something is the app coming to
+    /// the front, the item stays revealed at most this long.
+    static let pressFrontCap: TimeInterval = 3
+    /// A revealed item is clicked once its frame reads the same on two
+    /// walks in a row (within this many points), the agent's slide-in over.
+    /// Bounded: a frame that never settles is clicked where it last read.
+    static let pressFrameTolerance: CGFloat = 1
+    static let pressFrameCap: TimeInterval = 1
+    /// A press waits this long for a reveal or conceal already running.
+    static let pressTransitionWait: TimeInterval = 2
+    /// A newer press makes the one before it yield: it still waits this
+    /// long, at most, for its own menu to be gone (or to show) before the
+    /// item goes back, so it is not concealed under a menu that is opening.
+    static let pressYieldWait: TimeInterval = 0.8
+    /// The cover hides the reveal and the click, then lifts so the real icon
+    /// shows highlighted with its menu dropping from it. Not when the « was
+    /// expanded for the press: the visible run sits ~38pt from where the
+    /// cover's picture has it, and lifting would jump it. Flip to keep the
+    /// cover up through the menu (the final conceal raises its own).
+    static let pressCoverLiftsAfterClick = true
+
+    /// Command bar panel: entrance (fade + a 4pt drop) and exit (fade). The
+    /// exit is never longer than the entrance, so a Return never waits on it.
+    static let searchEntrance: TimeInterval = 0.18
+    static let searchExit: TimeInterval = 0.12
+    /// A focus change this soon after the panel opened is the menu or the
+    /// hotkey's own app handing focus over, not a click outside: the panel
+    /// takes key back once.
+    static let searchResignGuard: TimeInterval = 0.3
+    /// The result count is announced to VoiceOver this long after the last
+    /// keystroke, so typing doesn't queue one announcement per letter.
+    static let searchAnnounceDelay: Duration = .milliseconds(450)
 }

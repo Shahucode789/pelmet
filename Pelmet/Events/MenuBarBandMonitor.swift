@@ -11,6 +11,9 @@ final class MenuBarBandMonitor {
     private weak var appState: AppState?
     private var mouseMonitor: Any?
     private var localMouseMonitor: Any?
+    /// The pointer feed: a CG tap that wakes the main thread only for moves
+    /// the band cares about; the NSEvent monitors are its fallback.
+    private var pointerTap: PointerMoveTap?
     private var clickMonitor: Any?
     private var dragMonitor: Any?
     private var hoverTimer: Timer?
@@ -25,29 +28,104 @@ final class MenuBarBandMonitor {
     /// a catch-all for missed mouse-ups — but unconditionally snapshotting the
     /// AX tree on EVERY top-edge graze was the tax; only drags change layout.
     private var dragSinceAdoption = false
+    /// A drop waiting for its adoption pass. The bar must stay revealed
+    /// until then: a dropped item keeps its old section, and a conceal took
+    /// it off the bar before adoption could read where it landed.
+    private var dropAdoptionPending = false
+    /// The app owning the status item under the last mouse-down, and the one
+    /// the running ⌘-drag grabbed: the drop's adoption looks for its icon.
+    private var lastHitOwner: String?
+    private var dragOwner: String?
     /// Set by a deliberate conceal (chevron / empty-area click) so the hover
     /// path can't undo it while the pointer is still where it clicked.
     private var hoverSuppressedUntilExit = false
     private var lastDisplayUUID: String?
+
+    /// Per-screen geometry the mouse-move path reads on EVERY event, cached.
+    /// `NSScreen.screens`, `visibleFrame`, the notch areas and the display
+    /// UUID (a `deviceDescription` dictionary per call) each allocate or
+    /// round-trip, and together they were about half of what a pointer
+    /// move off the bar cost (perf audit 2026-10-02: 0.44ms and ~6 context
+    /// switches a move, ~4% CPU under a moving mouse). Screens change
+    /// rarely; the cache rebuilds on the notification.
+    private struct ScreenGeometry {
+        let screen: NSScreen
+        let frame: NSRect
+        /// The menu bar band, `.zero` on a screen with no bar.
+        let band: NSRect
+        /// The hardware cutout's open x span: nothing draws there, so it is
+        /// never the bar (2026-09-12: a pointer crossing it on the way to
+        /// Sconce's notch surface read as a bar hover).
+        let notch: (minX: CGFloat, maxX: CGFloat)?
+        let uuid: String?
+    }
+    private var screenGeometry: [ScreenGeometry] = []
+    private var screenObserver: NSObjectProtocol?
+
+    private func rebuildScreenGeometry() {
+        screenGeometry = NSScreen.screens.map { screen in
+            let bandHeight = screen.frame.maxY - screen.visibleFrame.maxY
+            let band = bandHeight > 0
+                ? NSRect(x: screen.frame.minX, y: screen.frame.maxY - bandHeight, width: screen.frame.width, height: bandHeight)
+                : .zero
+            var notch: (minX: CGFloat, maxX: CGFloat)?
+            if let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea {
+                notch = (left.maxX, right.minX)
+            }
+            return ScreenGeometry(screen: screen, frame: screen.frame, band: band, notch: notch, uuid: screen.displayUUIDString)
+        }
+        pointerTap?.update(displays: screenGeometry.compactMap { geometry in
+            guard let id = geometry.screen.directDisplayID else { return nil }
+            let bounds = CGDisplayBounds(id)
+            return PointerMoveTap.Display(bounds: bounds, bandMaxY: bounds.minY + geometry.band.height)
+        })
+    }
+
+    private func screenGeometry(containing point: NSPoint) -> ScreenGeometry? {
+        if screenGeometry.isEmpty { rebuildScreenGeometry() }
+        return screenGeometry.first { NSMouseInRect(point, $0.frame, false) }
+    }
+
+    /// `NSScreen` instances are stable between parameter changes, and the
+    /// cache rebuilds on each, so identity finds the entry.
+    private func geometry(of screen: NSScreen) -> ScreenGeometry? {
+        if let found = screenGeometry.first(where: { $0.screen === screen }) { return found }
+        rebuildScreenGeometry()
+        return screenGeometry.first { $0.screen === screen }
+    }
 
     init(appState: AppState) {
         self.appState = appState
     }
 
     func start() {
+        rebuildScreenGeometry()
+        screenObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.rebuildScreenGeometry() }
+        }
         // Passive global monitors: enough for hover + click detection, no
         // event swallowing (empty-area clicks fall through harmlessly).
-        mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
-            self?.pointerMoved()
-        }
-        // Global monitors never see the app's OWN events. While Pelmet is the
-        // active app — after Settings or onboarding closes it stays active
-        // with no window until the user clicks elsewhere — every menubar
-        // mouseMoved is Pelmet's own, and hovers went blind (2026-09-08:
-        // "the first few hovers after closing Settings do nothing").
-        localMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved]) { [weak self] event in
-            self?.pointerMoved()
-            return event
+        let tap = PointerMoveTap { [weak self] in self?.pointerMoved() }
+        if tap.start() {
+            pointerTap = tap
+            rebuildScreenGeometry()
+        } else {
+            PelmetLog.log("band: pointer tap unavailable — NSEvent monitors instead")
+            mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
+                self?.pointerMoved()
+            }
+            // Global monitors never see the app's OWN events. While Pelmet is
+            // the active app — after Settings or onboarding closes it stays
+            // active with no window until the user clicks elsewhere — every
+            // menubar mouseMoved is Pelmet's own, and hovers went blind
+            // (2026-09-08: "the first few hovers after closing Settings do
+            // nothing"). The tap sees its own process's events.
+            localMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved]) { [weak self] event in
+                self?.pointerMoved()
+                return event
+            }
         }
         clickMonitor = NSEvent.addGlobalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown]
@@ -79,6 +157,7 @@ final class MenuBarBandMonitor {
             if !cmdDragActive {
                 cmdDragActive = true
                 dragSinceAdoption = true
+                dragOwner = lastHitOwner
                 appState.pointerReturnedToBand()  // cancels any rehide countdown
                 PelmetLog.log("band: ⌘-drag started")
                 // Nothing walks icons into the hidden run any more, so the
@@ -92,16 +171,23 @@ final class MenuBarBandMonitor {
         case .leftMouseUp:
             guard cmdDragActive else { return }
             cmdDragActive = false
+            // The mouse-up was seen: the band-exit catch-all must not adopt
+            // early without the drop x. MenuBarAgent's drag image under the
+            // pointer reads as leaving the band right after the drop, and
+            // that pass blamed the drag on Pelmet's own icon (2026-09-25).
+            dragSinceAdoption = false
+            dropAdoptionPending = true
             // The drop x identifies WHICH item was dragged (it lands under
             // the cursor) — chevron-less zone adoption needs that identity.
             let dropX = NSEvent.mouseLocation.x
-            PelmetLog.log("band: ⌘-drag ended → adopting (dropX=\(Int(dropX)))")
+            let owner = dragOwner
+            PelmetLog.log("band: ⌘-drag ended → adopting (dropX=\(Int(dropX)), grabbed \(owner ?? "unknown"))")
             // Give MenuBarAgent a beat to finalize the new position, then
             // adopt before rehide can run a stale conceal.
             DispatchQueue.main.asyncAfter(deadline: .now() + AppTiming.dragAdoptDelay) { [weak self] in
                 guard let self, let appState = self.appState else { return }
-                self.dragSinceAdoption = false
-                appState.adoptSectionsFromBar(dragEndX: dropX)
+                self.dropAdoptionPending = false
+                appState.adoptSectionsFromBar(dragEndX: dropX, draggedBundle: owner)
                 if appState.isRevealed {
                     appState.pointerLeftBand()  // re-arm the countdown
                 }
@@ -112,6 +198,8 @@ final class MenuBarBandMonitor {
     }
 
     func stop() {
+        pointerTap?.stop()
+        pointerTap = nil
         if let mouseMonitor { NSEvent.removeMonitor(mouseMonitor) }
         if let localMouseMonitor { NSEvent.removeMonitor(localMouseMonitor) }
         localMouseMonitor = nil
@@ -128,9 +216,10 @@ final class MenuBarBandMonitor {
     private func pointerMoved() {
         guard let appState else { return }
         let location = NSEvent.mouseLocation
-        let screen = NSScreen.containing(location)
-        let inBand = screen.map { isBarHover(location, of: $0) } ?? false
-        let displayUUID = screen?.displayUUIDString
+        let geometry = screenGeometry(containing: location)
+        let screen = geometry?.screen
+        let inBand = geometry.map { isBarHover(location, of: $0) } ?? false
+        let displayUUID = geometry?.uuid
 
         // Per-display behavior: crossing onto an "always show all" display
         // reveals; crossing back to a "collapse" display arms the countdown.
@@ -210,10 +299,11 @@ final class MenuBarBandMonitor {
     /// pointer. Nil when nothing holds. One window list per verdict: the
     /// old Bool + diagnostic-twin pair walked the list twice per deferred
     /// reveal (perf audit 2026-09-15, fix 4b).
-    enum DeferReason: String { case band, active, elevated }
+    enum DeferReason: String { case band, active, elevated, drag }
 
     func rehideDeferReason() -> DeferReason? {
         if pointerInBand { return .band }
+        if cmdDragActive || dropAdoptionPending || appState?.dropAdoptionInFlight == true { return .drag }
         // Pelmet frontmost only holds the bar for the layout editor and the
         // onboarding demo — the General tab is not a reason to stay revealed.
         if NSApp.isActive, appState?.editorHoldsBar == true || OnboardingController.shared.isPresented { return .active }
@@ -281,9 +371,9 @@ final class MenuBarBandMonitor {
                 // latency, which is exactly a fast swipe-through. A
                 // graze must not open the bar.
                 let location = NSEvent.mouseLocation
-                guard let screen = NSScreen.containing(location),
-                      self.isBarHover(location, of: screen),
-                      self.isHoverZone(location, of: screen),
+                guard let geometry = self.screenGeometry(containing: location),
+                      self.isBarHover(location, of: geometry),
+                      self.isHoverZone(location, of: geometry.screen),
                       !appState.syntheticDragInFlight else { return }
                 appState.reveal([.hidden], reason: .hover)
             }
@@ -433,8 +523,9 @@ final class MenuBarBandMonitor {
     /// would not, and would also catch Control Center's host window across
     /// the top-right quadrant). Thin strips (Unclutter's 2pt trigger) and the
     /// menubar host window itself never exceed the band's height.
-    private func isBarHover(_ point: NSPoint, of screen: NSScreen) -> Bool {
-        guard isInMenuBarBand(point, of: screen) else { return false }
+    private func isBarHover(_ point: NSPoint, of geometry: ScreenGeometry) -> Bool {
+        guard isInMenuBarBand(point, of: geometry) else { return false }
+        let screen = geometry.screen
         let overlay = foreignOverlay(under: point, of: screen)
         if overlay != lastForeignOverlay {
             lastForeignOverlay = overlay
@@ -488,23 +579,13 @@ final class MenuBarBandMonitor {
     }
 
     private func isInMenuBarBand(_ point: NSPoint, of screen: NSScreen) -> Bool {
-        let bandHeight = screen.frame.maxY - screen.visibleFrame.maxY
-        guard bandHeight > 0 else { return false }
-        let band = NSRect(
-            x: screen.frame.minX,
-            y: screen.frame.maxY - bandHeight,
-            width: screen.frame.width,
-            height: bandHeight
-        )
-        guard NSMouseInRect(point, band, false) else { return false }
-        // The hardware cutout is never the bar: nothing draws there, so the
-        // window hit-test finds no overlay and read a pointer crossing it as
-        // a bar hover — on the way to Sconce's notch surface, the hidden
-        // icons came back (2026-09-12).
-        if let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea,
-           point.x > left.maxX, point.x < right.minX {
-            return false
-        }
+        guard let geometry = geometry(of: screen) else { return false }
+        return isInMenuBarBand(point, of: geometry)
+    }
+
+    private func isInMenuBarBand(_ point: NSPoint, of geometry: ScreenGeometry) -> Bool {
+        guard geometry.band.height > 0, NSMouseInRect(point, geometry.band, false) else { return false }
+        if let notch = geometry.notch, point.x > notch.minX, point.x < notch.maxX { return false }
         return true
     }
 
@@ -627,6 +708,7 @@ final class MenuBarBandMonitor {
             && (role == "AXMenuBar"
                 || owner == PelmetBundle.agentID
                 || role == "AXWindow" || role == "AXGroup")
+        lastHitOwner = role == "AXMenuBarItem" && owner != "?" ? owner : nil
         PelmetLog.log("band: hit-test role=\(role) owner=\(owner) → empty=\(empty)")
         return empty
     }

@@ -208,7 +208,13 @@ public struct SectionModel: Codable, Equatable, Sendable {
             for home in order.keys where home != target { order[home]?.removeAll { $0 == key } }
         }
         if order[target]?.contains(key) != true {
-            order[target, default: []].append(key)
+            // macOS ends the bar with Control Center and the clock: a new
+            // Visible item appended after them was drawn right of the clock,
+            // a slot the bar does not have (a shortcut, 2026-09-28).
+            var list = order[target] ?? []
+            let tail = target == .visible ? list.reversed().prefix(while: MenuBarPolicy.isPinnedSystemItem).count : 0
+            list.insert(key, at: list.count - tail)
+            order[target] = list
             changed = true
         }
         return changed

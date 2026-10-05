@@ -20,7 +20,12 @@ final class AppState {
     /// Settings window tab. Owned here (not view @State) so every window
     /// open can reset it to General — reopening straight onto the Menu Bar
     /// tab fired its full-reveal preview unprompted.
-    var settingsTab: SettingsTab = .general
+    var settingsTab: SettingsTab = .general {
+        didSet {
+            // Apply's "N not moved" belongs to the editor it came from (#60).
+            if oldValue == .menuBar, settingsTab != .menuBar { applyReport = nil }
+        }
+    }
     /// While the settings window is open, auto-rehide is fully suppressed —
     /// the user is mid-workflow between the editor and the bar, and nothing
     /// should collapse under them. Closing the window re-conceals.
@@ -37,12 +42,21 @@ final class AppState {
     /// it) — the General row says so beside the recorder.
     private(set) var hotkeyConflict = false
     private(set) var settingsHotkeyConflict = false
+    private(set) var alwaysHiddenHotkeyConflict = false
     private(set) var notificationCenterHotkeyConflict = false
+    private(set) var searchHotkeyConflict = false
+    /// One-shot: the setting row (`SettingsIndex` id) Settings should scroll
+    /// to and mark. Set by `openSettings(tab:row:)`, cleared by the view.
+    var settingsFocusRow: String?
+    /// Bumped when the command bar saves or resets its history, so the
+    /// Settings row that offers the reset knows whether there is any.
+    var searchHistoryRevision = 0
 
     var settingsWindowVisible = false {
         didSet {
             guard oldValue != settingsWindowVisible else { return }
             if !settingsWindowVisible {
+                applyReport = nil
                 applyPointerDisplayPolicyAfterDismissal()
             }
         }
@@ -55,7 +69,11 @@ final class AppState {
         settings.behavior(forDisplayUUID: NSScreen.underPointer?.displayUUIDString)
     }
 
-    @ObservationIgnored private lazy var transitions = TransitionCoordinator(appState: self, engine: engine)
+    @ObservationIgnored lazy var transitions = TransitionCoordinator(appState: self, engine: engine)
+    /// Opens an item's menu in place, hidden or not (see ItemPress).
+    @ObservationIgnored private lazy var press = ItemPress(appState: self)
+    /// The keyboard way into the bar (see CommandBarController).
+    @ObservationIgnored lazy var commandBar = CommandBarController(appState: self)
     private var rehide = RehideStateMachine()
     private var rehideTimer: Timer?
     /// One "rehide: deferred" line per armed countdown, not one per re-arm.
@@ -98,6 +116,7 @@ final class AppState {
         startMonitors()
         startEngineEventPump()
         bootEngine()
+        observeDebugOpenMenu()
     }
 
     private func wireTransitionSettleCallbacks() {
@@ -266,15 +285,26 @@ final class AppState {
             case .toggle: self?.toggle(reason: .hotkey)
             case .settings: self?.openSettings()
             case .notificationCenter: self?.openNotificationCenter()
+            case .alwaysHidden: self?.toggleAll(reason: .hotkey)
+            case .search: self?.commandBar.toggle(source: "hotkey")
             }
         }
         hotkeyConflict = !hotkey.register(settings.hotkey, slot: .toggle)
         settingsHotkeyConflict = !hotkey.register(settings.settingsHotkey, slot: .settings)
+        alwaysHiddenHotkeyConflict = !hotkey.register(settings.alwaysHiddenHotkey, slot: .alwaysHidden)
         notificationCenterHotkeyConflict = !hotkey.register(activeNotificationCenterHotkey, slot: .notificationCenter)
+        searchHotkeyConflict = !hotkey.register(settings.searchHotkey, slot: .search)
         registeredHotkey = settings.hotkey
         registeredSettingsHotkey = settings.settingsHotkey
+        registeredAlwaysHiddenHotkey = settings.alwaysHiddenHotkey
         registeredNotificationCenterHotkey = activeNotificationCenterHotkey
+        registeredSearchHotkey = settings.searchHotkey
         self.hotkey = hotkey
+        hotkey.onItemTrigger = { [weak self] slot in self?.itemHotkeyFired(slot) }
+        syncItemHotkeys()
+        // The command bar's panel is built once things have settled, not on
+        // the first shortcut.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.commandBar.warm() }
 
         // A relaunched app's status item is a FRESH registration made under
         // the assertion — it parks offscreen until an adoption window lets
@@ -578,7 +608,7 @@ final class AppState {
 
     // MARK: - Intents (UI + monitors call these)
 
-    func toggle(reason: RevealReason) {
+    func toggle(reason: RevealReason, sections: Set<PelmetCore.Section> = [.hidden]) {
         PerfTrace.markTrigger("\(reason)")
         // A click landing in the first moments of a hover reveal: the
         // pointer reached the chevron, the hover fired ~100ms later, and
@@ -600,7 +630,7 @@ final class AppState {
             dispatch(rehide.handle(.revealRequested(hoverSections, reason)))
             return
         }
-        let effects = rehide.handle(.toggleRequested([.hidden], reason))
+        let effects = rehide.handle(.toggleRequested(sections, reason))
         PelmetLog.log("toggle(\(reason)) state=\(rehide.state) effects=\(effects)")
         dispatch(effects)
         // A deliberate conceal under a hovering pointer must STAY concealed:
@@ -617,9 +647,210 @@ final class AppState {
         dispatch(rehide.handle(.revealRequested(sections, reason)))
     }
 
+    /// The Always Hidden shortcut (#67): everything out, or everything back
+    /// once it is all out. A reveal that left Always Hidden in widens to
+    /// include it instead of closing: the key asked for more, not less.
+    func toggleAll(reason: RevealReason) {
+        let all: Set<PelmetCore.Section> = [.hidden, .alwaysHidden]
+        let showing: Set<PelmetCore.Section>? = {
+            switch rehide.state {
+            case .revealed(let sections, _): sections
+            case .transitioning(target: .reveal(let sections, _), queued: nil): sections
+            default: nil
+            }
+        }()
+        if let showing, !showing.contains(.alwaysHidden) {
+            reveal(all, reason: reason)
+        } else {
+            toggle(reason: reason, sections: all)
+        }
+    }
+
     /// When the last hover reveal's effect started — the earliest the user
     /// could see the bar open (see `toggle`).
     private var hoverRevealStartedAt: Date?
+
+    /// Open an item's menu where it sits, whichever section it is in: on
+    /// the bar it is clicked, concealed it is brought back alone beneath a
+    /// cover for the click and put away once its menu is gone (ItemPress).
+    /// Pelmet's own extras run their own action instead of a click.
+    /// `.secondary` is the right click. The clock opens Notification Center
+    /// the way its shortcut does: a click on it is refused while the
+    /// assertion is held.
+    func openItemMenu(_ id: ItemID, button: ItemPress.Button = .primary) {
+        if button == .primary, id.rawValue.hasSuffix("::com.apple.menuextra.clock") {
+            openNotificationCenter()
+            return
+        }
+        press.open(id, button: button)
+    }
+
+    /// Show an item in the bar without clicking it: its section opens the
+    /// way the hotkey opens it (Always Hidden with Hidden, as the Always
+    /// Hidden shortcut does), and the rehide machine takes it from there.
+    func showItemInBar(_ id: ItemID) {
+        let key = id.sectionKey
+        let section = settings.sectionModel.section(of: key)
+        guard section != .visible else {
+            PelmetLog.log("press: show \(key.rawValue) — already in the visible section")
+            return
+        }
+        let wanted: Set<PelmetCore.Section> = section == .alwaysHidden ? [.hidden, .alwaysHidden] : [.hidden]
+        guard !wanted.isSubset(of: currentRevealedSections) else {
+            PelmetLog.log("press: show \(key.rawValue) — its section is already revealed")
+            return
+        }
+        PelmetLog.log("press: show \(key.rawValue) — revealing \(wanted.map(\.rawValue).sorted())")
+        reveal(wanted.union(currentRevealedSections), reason: .hotkey)
+    }
+
+    // MARK: - Pelmet's own extras
+
+    /// What a press on one of Pelmet's own extras needs first; nil when the
+    /// key is no extra (a separator, the chevron), which keep the click.
+    func ownPressNeed(_ key: ItemID, secondary: Bool) -> ExtrasManager.PressNeed? {
+        extras?.pressNeed(itemKey: key, rightClick: secondary)
+    }
+
+    func isOwnExtraShowing(_ key: ItemID) -> Bool { extras?.isShowing(key) ?? false }
+
+    /// Runs the extra's own action, the one its button runs on a click.
+    @discardableResult
+    func activateExtra(_ key: ItemID, secondary: Bool) -> Bool {
+        extras?.activate(itemKey: key, rightClick: secondary) ?? false
+    }
+
+    // MARK: - Per-item shortcuts
+
+    /// Why a combination cannot become an item's shortcut.
+    enum ItemHotkeyRefusal: Equatable {
+        /// Already one of Pelmet's own shortcuts; carries what it does.
+        case pelmet(String)
+        /// Already another item's shortcut.
+        case item(ItemID)
+        /// macOS holds it (System Settings › Keyboard Shortcuts).
+        case system
+        /// Another app registered it first.
+        case otherApp
+    }
+
+    /// Each item's shortcut opens its menu like a pick in the command bar.
+    /// Slots count up from `HotkeyManager.itemSlotBase`; a combination another
+    /// app holds is kept with no slot, so it is not retried on every settings
+    /// change.
+    private var itemHotkeyState: [String: (spec: HotkeySpec, slot: UInt32?)] = [:]
+    private var nextItemHotkeySlot = HotkeyManager.itemSlotBase
+
+    /// Brings the registrations in line with `settings.itemHotkeys`; cheap
+    /// when nothing changed.
+    func syncItemHotkeys() {
+        guard let hotkey else { return }
+        let wanted = settings.itemHotkeys
+        for (key, state) in itemHotkeyState where wanted[key] != state.spec {
+            if let slot = state.slot { hotkey.unregisterItem(slot: slot) }
+            itemHotkeyState.removeValue(forKey: key)
+        }
+        for (key, spec) in wanted where itemHotkeyState[key] == nil {
+            let slot = nextItemHotkeySlot
+            let registered = hotkey.registerItem(spec, slot: slot)
+            if registered { nextItemHotkeySlot += 1 }
+            itemHotkeyState[key] = (spec, registered ? slot : nil)
+        }
+    }
+
+    private func itemHotkeyFired(_ slot: UInt32) {
+        guard let key = itemHotkeyState.first(where: { $0.value.slot == slot })?.key else { return }
+        PelmetLog.log("hotkey: item shortcut → \(key)")
+        openItemMenu(ItemID(rawValue: key))
+    }
+
+    /// Sets (or, with nil, removes) an item's shortcut. Nil back when it
+    /// took; otherwise why not, with nothing changed.
+    @discardableResult
+    func setItemHotkey(_ spec: HotkeySpec?, for id: ItemID) -> ItemHotkeyRefusal? {
+        let key = id.sectionKey.rawValue
+        let previous = settings.itemHotkeys[key]
+        if let spec {
+            if let refusal = itemHotkeyRefusal(spec, for: key) { return refusal }
+            settings.itemHotkeys[key] = spec
+        } else {
+            settings.itemHotkeys.removeValue(forKey: key)
+        }
+        syncItemHotkeys()
+        if spec != nil, itemHotkeyState[key]?.slot == nil {
+            // RegisterEventHotKey said no: another app holds it.
+            settings.itemHotkeys[key] = previous
+            syncItemHotkeys()
+            return .otherApp
+        }
+        settings.save()
+        PelmetLog.log("hotkey: item \(key) shortcut \(spec?.display ?? "removed")")
+        return nil
+    }
+
+    private func itemHotkeyRefusal(_ spec: HotkeySpec, for key: String) -> ItemHotkeyRefusal? {
+        func same(_ other: HotkeySpec?) -> Bool {
+            other.map { $0.keyCode == spec.keyCode && $0.modifiers == spec.modifiers } ?? false
+        }
+        if same(settings.hotkey) { return .pelmet(String(localized: "Show Hidden Items")) }
+        if same(settings.alwaysHiddenHotkey) { return .pelmet(String(localized: "Show Always-Hidden Too")) }
+        if same(settings.searchHotkey) { return .pelmet(String(localized: "Search the menu bar")) }
+        if same(settings.settingsHotkey) { return .pelmet(String(localized: "Open Settings")) }
+        if same(activeNotificationCenterHotkey) { return .pelmet(String(localized: "Open Notification Center")) }
+        if let other = settings.itemHotkeys.first(where: { $0.key != key && same($0.value) })?.key {
+            return .item(ItemID(rawValue: other))
+        }
+        return SystemShortcuts.owns(spec) ? .system : nil
+    }
+
+    /// The user's own name for an item; empty clears it.
+    func setItemAlias(_ alias: String, for id: ItemID) {
+        let key = id.sectionKey.rawValue
+        let trimmed = alias.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            settings.itemAliases.removeValue(forKey: key)
+        } else {
+            settings.itemAliases[key] = String(trimmed.prefix(40))
+        }
+        settings.save()
+        PelmetLog.log("search: alias for \(key) \(trimmed.isEmpty ? "removed" : "set")")
+    }
+
+    /// Debug: `defaults write app.fif7y.Pelmet pelmet.debug.openMenu -bool YES`,
+    /// then relaunch. The distributed notification `app.fif7y.Pelmet.debug.openMenu`
+    /// opens the menu of the item its object names (a section key or a bundle
+    /// id; userInfo `button` = "secondary" for the right click), for testing
+    /// the press without any UI. Not observed unless the flag is set.
+    private func observeDebugOpenMenu() {
+        guard UserDefaults.standard.bool(forKey: "pelmet.debug.openMenu") else { return }
+        debugOpenMenuObserver = DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("app.fif7y.Pelmet.debug.openMenu"), object: nil, queue: .main
+        ) { [weak self] note in
+            let name = note.object as? String
+            let secondary = note.userInfo?["button"] as? String == "secondary"
+            MainActor.assumeIsolated { self?.debugOpenMenu(matching: name, secondary: secondary) }
+        }
+        PelmetLog.log("press: debug trigger on — app.fif7y.Pelmet.debug.openMenu")
+    }
+
+    @ObservationIgnored private var debugOpenMenuObserver: NSObjectProtocol?
+
+    private func debugOpenMenu(matching name: String?, secondary: Bool) {
+        guard let name, !name.isEmpty else {
+            PelmetLog.log("press: debug — no item named in the notification's object")
+            return
+        }
+        var ids = Set(settings.sectionModel.assignments.keys)
+        for item in snapshot?.items ?? [] { ids.insert(item.id.sectionKey) }
+        for id in snapshot?.concealed ?? [] { ids.insert(id.sectionKey) }
+        let matches = ids.filter { $0.rawValue == name || $0.bundleID == name }.sorted { $0.rawValue < $1.rawValue }
+        guard let id = matches.first else {
+            PelmetLog.log("press: debug — no item matches \(name)")
+            return
+        }
+        if matches.count > 1 { PelmetLog.log("press: debug — \(matches.count) items match \(name), taking \(id.rawValue)") }
+        openItemMenu(id, button: secondary ? .secondary : .primary)
+    }
 
     func concealNow() {
         PelmetLog.log("concealNow state=\(rehide.state)")
@@ -701,7 +932,10 @@ final class AppState {
         separators?.apply(model: settings.sectionModel, revealed: currentRevealedSections)
     }
 
-    func openSettings(tab: SettingsTab = .general) {
+    /// `row` is a setting the window should scroll to and mark once (the
+    /// command bar's jump); the Settings view takes it and clears it.
+    func openSettings(tab: SettingsTab = .general, row: String? = nil) {
+        settingsFocusRow = row
         SettingsWindowController.shared.show(appState: self, tab: tab)
     }
 
@@ -736,7 +970,9 @@ final class AppState {
     private var settingsApplyWork: Task<Void, Never>?
     private var registeredHotkey: HotkeySpec?
     private var registeredSettingsHotkey: HotkeySpec?
+    private var registeredAlwaysHiddenHotkey: HotkeySpec?
     private var registeredNotificationCenterHotkey: HotkeySpec?
+    private var registeredSearchHotkey: HotkeySpec?
     /// The shortcut rides on the clock relay: off with it, not on its own.
     private var activeNotificationCenterHotkey: HotkeySpec? {
         settings.clockClickOpensNotificationCenter ? settings.notificationCenterHotkey : nil
@@ -795,11 +1031,27 @@ final class AppState {
 
     private func clockClicked(at point: CGPoint, pointer: CGPoint, viaShortcut: Bool = false) {
         Task { @MainActor in
-            // Dot zone (target ≠ where the click landed): press the clock
-            // through AX so the pointer never moves; the click is the
-            // fallback. The element is resolved now, on a static bar.
-            let clockElement = point == pointer ? nil : ClockClickRelay.clockElement(at: point)
+            // Press the clock through AX so the pointer never moves; the
+            // click is the fallback. Dot-zone clicks pressed since
+            // 2026-09-19, clicks on the clock itself replayed at the spot
+            // they landed, which dragged a hand that had moved on back to
+            // it (#74). The element is resolved now, on a static bar.
+            let clockElement = ClockClickRelay.clockElement(at: point)
             let panelWasOpen = ClockClickRelay.notificationCenterIsOpen() || Date().timeIntervalSince(panelOpenedAt) < 1
+            // Where a replayed click lands: under the pointer while it is
+            // still on the clock (no drag, nothing to put back), else the
+            // target, with the pointer put back where the hand is now, not
+            // where it clicked (a hand that had left was pulled back to the
+            // clock). A close may land in the dot zone too, an open needs
+            // the clock itself.
+            let replayClick = { [clockRelay] (closing: Bool) in
+                let live = CGEvent(source: nil)?.location
+                if let live, clockRelay?.isOnClock(live, dotZoneIncluded: closing) == true {
+                    ClockClickRelay.postClick(at: live, pointer: live)
+                } else {
+                    ClockClickRelay.postClick(at: point, pointer: live ?? pointer)
+                }
+            }
             // Closing needs no blink: the panel dismisses itself on a click
             // outside it, and the assertion only refuses the clock's OWN
             // action. A plain replay of the click, no cover, no picture,
@@ -808,7 +1060,7 @@ final class AppState {
             // assertion held the clock's click is refused (probed 0/2).
             if panelWasOpen {
                 await ClockClickRelay.waitForButtonRelease()
-                ClockClickRelay.postClick(at: point, pointer: pointer)
+                replayClick(true)
                 panelOpenedAt = .distantPast
                 PelmetLog.log("clock: panel open — click replayed, no blink")
                 // The bare bar is back once the panel has left (and its
@@ -836,8 +1088,16 @@ final class AppState {
                     transitions.swapBlinkCoverUnderPanel(cover)
                 }
             }
-            let blinked = await engine.beginClockBlink()
-            if let clockElement {
+            var blinked = await engine.beginClockBlink()
+            if !viaShortcut, ClockClickRelay.pressNeverOpensPanel {
+                // This macOS never opened the panel on a press: replay the
+                // click, once the button is up (the cover is often up before
+                // the finger is, since the idle picture).
+                await ClockClickRelay.waitForButtonRelease()
+                replayClick(false)
+                panelStarting()
+                PelmetLog.log("clock: click replayed — the press does not open the panel on this macOS")
+            } else if let clockElement {
                 // Only once the physical button is up: pressed while the
                 // finger is still down (the tap swallows the up ~80ms
                 // later), the clock merely highlighted. Then let the agent
@@ -848,8 +1108,15 @@ final class AppState {
                 await ClockClickRelay.waitForButtonRelease()
                 try? await Task.sleep(for: AppTiming.clockPressSettle)
                 var opened = false
+                // Presses that went out, waited their whole window with the
+                // assertion still down, and brought no panel.
+                var cleanMisses = 0
                 for attempt in 1...2 where !opened {
-                    let pressed = ClockClickRelay.press(clockElement)
+                    // `pelmet.debug.clockPressNoop`: report the press sent
+                    // without pressing, the way it lands on 27.0.x, to test
+                    // that path on a macOS where the press works.
+                    let pressed = UserDefaults.standard.bool(forKey: "pelmet.debug.clockPressNoop")
+                        || ClockClickRelay.press(clockElement)
                     if pressed, attempt == 1 { panelStarting() }
                     // Poll for the panel rather than sleeping the whole
                     // verify budget: it shows well inside it, and every ms
@@ -859,7 +1126,22 @@ final class AppState {
                         try? await Task.sleep(for: .milliseconds(30))
                         opened = ClockClickRelay.notificationCenterIsOpen()
                     } while !opened && Date() < verifyUntil
-                    PelmetLog.log("clock: dot press \(attempt) \(pressed ? "sent" : "refused") - NC \(opened ? "open" : "not open")")
+                    PelmetLog.log("clock: press \(attempt) \(pressed ? "sent" : "refused") - NC \(opened ? "open" : "not open")")
+                    if pressed, !opened, await !engine.holdsAssertion { cleanMisses += 1 }
+                }
+                if !opened, !viaShortcut {
+                    // The drop's own reflow can converge and take the
+                    // assertion back while the presses wait (the endClockBlink
+                    // note), and the replay below would be refused too: drop
+                    // it again first. A miss with the assertion back says
+                    // nothing about the press; a clean one, then no panel by
+                    // the end of the click, says this macOS never wires the
+                    // press to it (#74, 27.0.1).
+                    if await engine.holdsAssertion {
+                        PelmetLog.log("clock: assertion back during the presses — dropped again for the click")
+                        blinked = await engine.beginClockBlink() || blinked
+                    }
+                    if cleanMisses > 0 { ClockClickRelay.notePressNeverOpensPanel() }
                 }
                 if !opened {
                     // A key never moves the pointer: the shortcut stops at
@@ -867,12 +1149,12 @@ final class AppState {
                     if viaShortcut {
                         PelmetLog.log("clock: shortcut — panel not seen after 2 presses, no click replayed")
                     } else {
-                        ClockClickRelay.postClick(at: point, pointer: pointer); panelStarting()
+                        replayClick(false); panelStarting()
                     }
                 }
             } else {
-                if point != pointer { PelmetLog.log("clock: dot click - no clock element under the target, replaying the click") }
-                ClockClickRelay.postClick(at: point, pointer: pointer)
+                PelmetLog.log("clock: no clock element under the target, replaying the click")
+                replayClick(false)
                 panelStarting()
             }
             guard blinked else { cover?.dismiss(); return }
@@ -880,6 +1162,81 @@ final class AppState {
             await engine.endClockBlink()
             if let cover { transitions.endBarCover(cover) }
         }
+    }
+
+    /// Set while the Camera & mic relay has the assertion down: Apple's
+    /// pill is back on the bar for that moment, and Pelmet's item must not
+    /// step aside for it (a reflow under the cover, and again after).
+    private var audioVideoRelayActive = false
+    /// Which relay the flag belongs to: only the latest one clears it.
+    private var audioVideoRelayGeneration = 0
+
+    /// The Camera & mic item was clicked: open Apple's own pill (#68) the
+    /// way a clock click opens Notification Center, the assertion dropped
+    /// under a picture of the bar and back once the panel is up. A SharePlay
+    /// session passes Apple's SharePlay icon ahead of the pill. False when
+    /// no pill or panel showed, for the caller's fallback.
+    func openAudioVideoPill(near point: CGPoint, identifiers: [String] = [AudioVideoPill.identifier]) async -> Bool {
+        guard !clockBlinkInFlight else {
+            PelmetLog.log("audiovideo: blink in flight — press ignored")
+            return true
+        }
+        clockBlinkInFlight = true
+        audioVideoRelayActive = true
+        audioVideoRelayGeneration += 1
+        let generation = audioVideoRelayGeneration
+        defer {
+            clockBlinkInFlight = false
+            Task { @MainActor in await settleAfterAudioVideoRelay(generation) }
+        }
+        // The agent answers AX only once the drop's reflow is done: the
+        // pill came back 0.6–1.25s after it, and a cover on the usual 2.5s
+        // safety faded before the re-acquire had hidden the bar again.
+        let cover = await transitions.beginBarCover(
+            label: "audiovideo",
+            safety: AppTiming.transitionCoverSafety + AppTiming.audioVideoPillWait + AppTiming.clockPressVerify
+        )
+        let blinked = await engine.beginClockBlink(label: "audiovideo")
+        let opened = await AudioVideoPill.open(near: point, identifiers: identifiers)
+        guard blinked else { cover?.dismiss(); return opened }
+        try? await Task.sleep(for: AppTiming.clockBlinkReacquire)
+        await engine.endClockBlink()
+        if let cover { transitions.endBarCover(cover, label: "audiovideo") }
+        return opened
+    }
+
+    /// The re-acquire leaves AX mid-reflow for up to ~0.8s: Apple's pill
+    /// and the revealed icons still listed, overlapping (read as icons
+    /// behind the «), and that stale walk stayed the snapshot. Once the
+    /// flag cleared on a timer, the next extras apply saw the pill "up" and
+    /// Camera & mic stepped aside until the next reveal; a second relay
+    /// inside the first one's timer lost the flag mid-drop the same way
+    /// (#68, 2-3 clicks in a row). Hold the flag until a fresh walk shows
+    /// the bar settled, keep that walk, re-apply, and only for the latest
+    /// relay.
+    private func settleAfterAudioVideoRelay(_ generation: Int) async {
+        let deadline = Date().addingTimeInterval(AppTiming.clockBlinkCoverDeadline)
+        let screenMaxX = NSScreen.screens.first?.frame.maxX ?? .greatestFiniteMagnitude
+        func settled(_ snap: EngineSnapshot) -> Bool {
+            let frames = snap.items.compactMap(\.frame).filter { $0.width > 4 && PlacementGeometry.isPrimary($0, screenMaxX: screenMaxX) }
+            return !snap.items.contains { $0.id.rawValue.hasSuffix(AudioVideoPill.identifier) && $0.frame != nil }
+                && PlacementGeometry.overflowTrapped(frames).isEmpty
+        }
+        var snap = await engine.freshSnapshot()
+        var walks = 1
+        while !settled(snap), Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(150))
+            guard generation == audioVideoRelayGeneration else { return }
+            snap = await engine.freshSnapshot()
+            walks += 1
+        }
+        guard generation == audioVideoRelayGeneration else { return }
+        PelmetLog.log("audiovideo: bar \(settled(snap) ? "settled" : "still unsettled at the deadline") after \(walks) walk(s)")
+        updateSnapshot(snap)
+        audioVideoRelayActive = false
+        // A transition in flight re-applies at its settle catch-up.
+        guard !isTransitioning else { return }
+        extras?.apply(model: settings.sectionModel, revealed: currentRevealedSections, systemCameraPillVisible: systemCameraPillVisible)
     }
 
     // MARK: - Section helper events (HelperHosts)
@@ -985,10 +1342,19 @@ final class AppState {
             settingsHotkeyConflict = !(hotkey?.register(settings.settingsHotkey, slot: .settings) ?? true)
             registeredSettingsHotkey = settings.settingsHotkey
         }
+        if settings.alwaysHiddenHotkey != registeredAlwaysHiddenHotkey {
+            alwaysHiddenHotkeyConflict = !(hotkey?.register(settings.alwaysHiddenHotkey, slot: .alwaysHidden) ?? true)
+            registeredAlwaysHiddenHotkey = settings.alwaysHiddenHotkey
+        }
         if activeNotificationCenterHotkey != registeredNotificationCenterHotkey {
             notificationCenterHotkeyConflict = !(hotkey?.register(activeNotificationCenterHotkey, slot: .notificationCenter) ?? true)
             registeredNotificationCenterHotkey = activeNotificationCenterHotkey
         }
+        if settings.searchHotkey != registeredSearchHotkey {
+            searchHotkeyConflict = !(hotkey?.register(settings.searchHotkey, slot: .search) ?? true)
+            registeredSearchHotkey = settings.searchHotkey
+        }
+        syncItemHotkeys()
         // Newly created separators and toggled-on extras get hosted wherever
         // macOS pleases (the order hint when it is fresh, the hidden side
         // when not): through the Apply door like any own item entering the
@@ -1227,6 +1593,22 @@ final class AppState {
         twin.setShown(true)
     }
 
+    /// A move asked for outside the editor (the command bar). Membership
+    /// alone leaves the icon where it sits, left of the chevron for a newly
+    /// visible one (2026-10-04), so it is drawn at the chevron side of its
+    /// new section and applied at once. Edits the editor already holds stay
+    /// the person's to apply: then the move only joins them.
+    func moveItemNow(_ id: ItemID, to section: PelmetCore.Section) {
+        let othersPending = applyPending
+        let before = section == .visible ? editorItems(in: .visible).first { $0.id != id }?.id : nil
+        moveItem(id, to: section, before: before)
+        guard !othersPending else {
+            PelmetLog.log("editor: move of \(id.rawValue) joins pending edits, not applied")
+            return
+        }
+        applyOrderEdits()
+    }
+
     func moveItem(_ id: ItemID, to section: PelmetCore.Section, before beforeID: ItemID?) {
         // A drop that lands while a pass runs would be cleared with the
         // pass's own edits on success; the editor is inert meanwhile, this
@@ -1309,6 +1691,8 @@ final class AppState {
     private var ownItemsAwaitingReveal: Set<ItemID> = []
     /// Own items that already got their one retry after a failed pass.
     private var ownItemsRetried: Set<ItemID> = []
+    /// Passes that found the item not laid out yet, by item.
+    private var ownItemMisses: [ItemID: Int] = [:]
     /// When the boot adoption saw every own item; nil until then.
     private var ownItemsAdoptedAt: ContinuousClock.Instant?
 
@@ -1334,7 +1718,12 @@ final class AppState {
         // A pass reveals too; leave the queue for a user reveal then.
         guard !applying, !ownItemsAwaitingReveal.isEmpty else { return }
         let revealed = currentRevealedSections
-        let due = ownItemsAwaitingReveal.filter { revealed.contains(settings.sectionModel.section(of: $0)) }
+        // Visible is on screen at every reveal: an item that missed its pass
+        // there goes through the door at the next one too.
+        let due = ownItemsAwaitingReveal.filter {
+            let section = settings.sectionModel.section(of: $0)
+            return section == .visible || revealed.contains(section)
+        }
         guard !due.isEmpty else { return }
         ownItemsAwaitingReveal.subtract(due)
         Task {
@@ -1342,10 +1731,10 @@ final class AppState {
         }
     }
 
-    func placeOwnItemSoon(_ id: ItemID) {
+    func placeOwnItemSoon(_ id: ItemID, after lead: Duration = AppTiming.newExtraPlacementDelay) {
         ownItemPassLeads[id]?.cancel()
         ownItemPassLeads[id] = Task { [weak self] in
-            try? await Task.sleep(for: AppTiming.newExtraPlacementDelay)
+            try? await Task.sleep(for: lead)
             guard !Task.isCancelled, let self else { return }
             ownItemPassLeads.removeValue(forKey: id)
             await placeOwnItemNow(id)
@@ -1390,12 +1779,33 @@ final class AppState {
         let report = await ApplyPass.run(appState: self, scope: .ownItem(id))
         PelmetLog.log("apply: own \(id.rawValue) applied=\(report.applied.count) failed=\(report.failed.count) skipped=\(report.skipped.count)")
         if !report.applied.isEmpty { await engine.writeOrderHint() }
+        // Not laid out yet: a brand-new item reaches the bar's AX tree on
+        // the agent's beat, and a shortcut added on a concealed bar was not
+        // there 640ms later, so it stayed left of the chevron in Visible
+        // (2026-09-28). One more pass after a longer wait, then the next
+        // reveal settle, then it is Apply's.
+        let missed = report.skipped.contains { $0.item == id.sectionKey && $0.why == .notOnScreen }
+        if missed {
+            let misses = (ownItemMisses[id] ?? 0) + 1
+            ownItemMisses[id] = misses
+            switch misses {
+            case 1:
+                PelmetLog.log("apply: own \(id.rawValue) not on screen yet — one more pass shortly")
+                placeOwnItemSoon(id, after: AppTiming.ownItemRetryDelay)
+            case 2:
+                PelmetLog.log("apply: own \(id.rawValue) still not on screen — waits for a reveal")
+                ownItemsAwaitingReveal.insert(id)
+            default:
+                PelmetLog.log("apply: own \(id.rawValue) never on screen — left to Apply")
+                ownItemMisses.removeValue(forKey: id)
+            }
         // A failed move on a concealable section gets one more try at the
         // next reveal settle (the bar may have concealed mid-pass).
-        if !report.failed.isEmpty, section != .visible, ownItemsRetried.insert(id).inserted {
+        } else if !report.failed.isEmpty, section != .visible, ownItemsRetried.insert(id).inserted {
             ownItemsAwaitingReveal.insert(id)
         } else if !report.applied.isEmpty {
             ownItemsRetried.remove(id)
+            ownItemMisses.removeValue(forKey: id)
         }
     }
 
@@ -1418,13 +1828,12 @@ final class AppState {
     /// starts from. A drawing that drifted from the bar without an edit is
     /// harmless until an edit makes the plan honour it, and then one drop
     /// read "Apply (2)" (2026-09-21). Members the bar has no frame for keep
-    /// their drawn place after the framed ones.
+    /// their drawn slot (`BarAdoption.refill`).
     func barBasedOrder(in section: PelmetCore.Section, model: SectionModel) -> [ItemID] {
         let members = model.order[section] ?? currentOrder(in: section)
         guard let snapshot else { return members }
         let onBar = ApplyPass.barOrder(ApplyPass.rememberedFrames(snapshot, appState: self))
-            .filter(members.contains)
-        return onBar + members.filter { !onBar.contains($0) }
+        return BarAdoption.refill(members, inBarOrder: onBar)
     }
 
     /// The on-screen left-to-right order of a section right now (fallback when
@@ -1707,17 +2116,43 @@ final class AppState {
         destroyedKeys.contains(id.sectionKey)
     }
 
+    /// The app's running copy lives outside an Applications folder. macOS
+    /// matches the allowlist through LaunchServices and misses a copy run
+    /// from a build folder, so the assertion hides it whatever Pelmet
+    /// allows (DerivedData, proven 2026-08-29; #66's local cmux build).
+    func runsOutsideApplications(_ id: ItemID) -> Bool {
+        guard let bundle = id.bundleID,
+              let path = NSRunningApplication.runningApplications(withBundleIdentifier: bundle).first?.bundleURL?.path
+        else { return false }
+        let homeApplications = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications").path
+        return !["/Applications/", "/System/Applications/", homeApplications + "/"].contains { path.hasPrefix($0) }
+    }
+
     // MARK: - Effects
 
     /// Pelmet-owned items hide by their OWN visibility, not the assertion —
     /// asserting away Pelmet's bundle would take the chevron too.
     var revealedSectionsForExtras: Set<PelmetCore.Section> { currentRevealedSections }
 
-    /// macOS force-shows its camera pill through the assertion while the
-    /// camera is live; Pelmet's indicator defers to it to avoid duplication.
+    /// Apple's camera pill is on the bar, which only happens with no
+    /// assertion held (a full reveal); Pelmet's indicator defers to it to
+    /// avoid duplication. Not while the relay has it up for a click.
     var systemCameraPillVisible: Bool {
-        (snapshot?.items ?? []).contains {
+        guard !audioVideoRelayActive else { return false }
+        return (snapshot?.items ?? []).contains {
             $0.id.rawValue.contains("menuextra.audiovideo") && $0.frame != nil
+        }
+    }
+
+    /// When one of Pelmet's own items last came, left or changed face.
+    var ownBarSignature: String { extras?.barSignature ?? "" }
+
+    /// Apple's SharePlay icon is on screen (a full reveal lets it back):
+    /// the Camera & mic item steps aside for it as it does for the pill.
+    var systemSharePlayVisible: Bool {
+        guard !audioVideoRelayActive else { return false }
+        return (snapshot?.items ?? []).contains {
+            $0.id.rawValue.hasSuffix(AudioVideoPill.sharePlayIdentifier) && $0.frame != nil
         }
     }
 
@@ -1807,13 +2242,25 @@ final class AppState {
     /// ⌘-dragged into Hidden while the 10s pass ran — the drop was lost and
     /// the item never adopted, 2026-09-08). Replayed when the chain ends.
     private var queuedDragEndX: CGFloat?
+    /// A drop's chain is running: the bar stays revealed until it has read
+    /// where the icon landed (the band's `.drag` rehide hold). A conceal
+    /// mid-chain took the dropped icon, still in its old section, off the
+    /// bar (2026-09-25).
+    private(set) var dropAdoptionInFlight = false
+    /// The app whose icon the last ⌘-drag grabbed (the band's hit-test at
+    /// mouse-down), nil when unknown.
+    private var lastDropBundle: String?
 
     /// When the band monitor last saw a user ⌘-drag end. The order
     /// supervisor stays out of the way while that adoption lands.
     private(set) var lastUserDragEndedAt: Date?
 
-    func adoptSectionsFromBar(retry: Int = 0, dragEndX: CGFloat? = nil) {
-        if retry == 0, dragEndX != nil { lastUserDragEndedAt = .now }
+    func adoptSectionsFromBar(retry: Int = 0, dragEndX: CGFloat? = nil, draggedBundle: String? = nil) {
+        if retry == 0, dragEndX != nil {
+            lastUserDragEndedAt = .now
+            dropAdoptionInFlight = true
+            lastDropBundle = draggedBundle
+        }
         if retry == 0 {
             guard !adoptionInFlight else {
                 if let dragEndX { queuedDragEndX = dragEndX }
@@ -1830,6 +2277,7 @@ final class AppState {
                 guard retry < AppTiming.adoptMaxDeferrals else {
                     PelmetLog.log("adopt: gave up after \(retry) deferrals")
                     adoptionInFlight = false
+                    dropAdoptionInFlight = false
                     if let queued = queuedDragEndX {
                         queuedDragEndX = nil
                         adoptSectionsFromBar(dragEndX: queued)
@@ -1853,8 +2301,18 @@ final class AppState {
                 adoptSectionsFromBar(retry: retry + 1, dragEndX: dragEndX)
                 return
             }
+            // The dropped icon is still in MenuBarAgent's drop animation (up
+            // to 1.6s on a crowded bar): nothing under the drop yet, and a
+            // pass now loses which icon the user moved (2026-09-25).
+            if let dragEndX, !Self.dropLanded(snap, at: dragEndX, bundle: lastDropBundle), retry < AppTiming.adoptMaxDeferrals {
+                PelmetLog.log("adopt: nothing under the drop yet — waiting (retry=\(retry))")
+                try? await Task.sleep(for: AppTiming.adoptDeferralDelay)
+                adoptSectionsFromBar(retry: retry + 1, dragEndX: dragEndX)
+                return
+            }
             defer {
                 adoptionInFlight = false
+                dropAdoptionInFlight = false
                 if let queued = queuedDragEndX {
                     queuedDragEndX = nil
                     PelmetLog.log("adopt: replaying queued drop x=\(Int(queued))")
@@ -2142,6 +2600,20 @@ final class AppState {
         return hosts
     }
 
+    /// A primary-band frame sits under the drop x: the dropped icon has
+    /// landed where `adopt` looks for it.
+    /// With the grabbed app known, it must be that app's icon.
+    private static func dropLanded(_ snap: EngineSnapshot, at x: CGFloat, bundle: String?) -> Bool {
+        let primaryMaxX = NSScreen.screens.first?.frame.maxX ?? .greatestFiniteMagnitude
+        return snap.items.contains { item in
+            guard let frame = item.frame, MenuBarGeometry.isInBand(frame),
+                  frame.midX > 0, frame.midX < primaryMaxX,
+                  bundle.map({ item.id.bundleID == $0 }) ?? true
+            else { return false }
+            return frame.minX - 8 <= x && x <= frame.maxX + 8
+        }
+    }
+
     private func adopt(from snap: EngineSnapshot, dragEndX: CGFloat? = nil) {
         // No showStatusItem guard: with the Pelmet icon hidden reconcile
         // falls back to cluster-edge boundaries, where zone adoption applies
@@ -2169,7 +2641,11 @@ final class AppState {
                 .compactMap { item -> (id: ItemID, distance: CGFloat)? in
                     guard let frame = item.frame else { return nil }
                     guard frame.minX - 8 <= x, x <= frame.maxX + 8 else { return nil }
-                    return (item.id, abs(frame.midX - x))
+                    // The grabbed app's icon wins over a neighbour under the
+                    // same x: Pelmet's own icon next to the drop took the
+                    // credit for One Thing's drag (2026-09-25).
+                    let grabbed = lastDropBundle.map { item.id.bundleID == $0 } ?? false
+                    return (item.id, abs(frame.midX - x) - (grabbed ? 10_000 : 0))
                 }
                 .min { $0.distance < $1.distance }
             if let hit { PelmetLog.log("adopt: dragged=\(hit.id.rawValue)") }

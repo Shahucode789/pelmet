@@ -184,6 +184,15 @@ import Testing
         #expect(!again)
     }
 
+    @Test func enrollKeepsTheClockLast() {
+        // 2026-09-28: a new shortcut was ordered after the clock.
+        let controlCenter = ItemID(rawValue: "status:com.apple.MenuBarAgent::com.apple.menuextra.controlcenter")
+        let clock = ItemID(rawValue: "status:com.apple.MenuBarAgent::com.apple.menuextra.clock")
+        var model = SectionModel(order: [.visible: [battery, controlCenter, clock].map(\.sectionKey)])
+        model.enroll(media.sectionKey)
+        #expect(model.order[.visible] == [battery, media, controlCenter, clock].map(\.sectionKey))
+    }
+
     @Test func enrollIntoSectionAssignsAndRehomes() {
         var model = SectionModel(order: [.visible: [media.sectionKey]])
         let changed = model.enroll(media.sectionKey, in: .hidden)

@@ -177,6 +177,7 @@ final class ConcealGhostOverlay {
         guard let rect, rect.width > 8, let list = list ?? onScreenWindows(),
               let primary = NSScreen.screens.first else { return [] }
         let me = ProcessInfo.processInfo.processIdentifier
+        let notificationCenter = ClockClickRelay.notificationCenterPID()
         let barLevel = Int(CGWindowLevelForKey(.mainMenuWindow))
         let zones: [CGRect] = (primaryOnly ? [primary] : NSScreen.screens).compactMap { screen in
             guard let displayID = screen.directDisplayID else { return nil }
@@ -202,8 +203,9 @@ final class ConcealGhostOverlay {
             // Dock raises a display-sized backstop under it. In the
             // signature they dropped the idle picture on every open and
             // again a second after every close (#51, 2026-09-22).
+            // By pid, not name: the owner name is localized ("알림 센터").
+            if ClockClickRelay.isNotificationCenterWindow(w, pid: notificationCenter) { continue }
             let owner = w[kCGWindowOwnerName as String] as? String ?? ""
-            if owner == "Notification Center" { continue }
             if owner == "Dock", width >= 1000, height >= 700 { continue }
             let frame = CGRect(x: x, y: y, width: width, height: height)
             guard zones.contains(where: { $0.intersects(frame) }) else { continue }
@@ -597,11 +599,19 @@ final class ConcealGhostOverlay {
     /// nearest x=0: a display parked left of the primary put its strip at
     /// x=-864 against the primary's 1012, and `keep` mapped off the picture
     /// (2026-09-18, three displays).
+    /// How far this strip sits from the primary's, by RIGHT edges: the
+    /// translation is right-anchored, and only the primary capture's left
+    /// edge can be clamped to the notch (snapshotSet). Measured by left
+    /// edges, a primary strip clamped 124pt in put the keep crop 124pt too
+    /// far left on the external display — Saturn, Snib and Sound fell off
+    /// the picture and popped in at lift (2026-10-02).
     private static func primaryOffset(of strip: BarSnapshot, in strips: [BarSnapshot]) -> CGFloat {
         let primaryFrame = NSScreen.screens.first?.frame ?? .zero
         let primary = strips.first { primaryFrame.contains(CGPoint(x: $0.windowFrame.midX, y: primaryFrame.midY)) }
             ?? strips.min(by: { abs($0.windowFrame.minX) < abs($1.windowFrame.minX) })
-        return primary?.windowFrame.minX ?? 0
+        guard let primary else { return 0 }
+        // The caller subtracts this from the strip's minX to get its offset.
+        return strip.windowFrame.minX - (strip.windowFrame.maxX - primary.windowFrame.maxX)
     }
 
     private static func cutOut(

@@ -54,6 +54,20 @@ final class ExtrasManager {
     /// is skipped (2026-09-21). A button whose image is nil (fresh item)
     /// always draws.
     private var glyphKeys: [UUID: String] = [:]
+    /// The own items as the bar shows them: which are up, with which face.
+    /// The blink cover's idle picture is only true of a bar whose own items
+    /// read the same (Camera & mic's SharePlay face missing for 0.65s under
+    /// the click's cover, 60fps burst 2026-09-25). A timestamp of the last
+    /// change stood here: it moved on every show AND hide, so one hover
+    /// reveal (extras up, then down again, the bar exactly as pictured)
+    /// staled the picture for every clock click after it, each paying a
+    /// ~250ms capture (#74, 2026-10-02).
+    var barSignature: String {
+        lastVisible.filter(\.value).keys
+            .sorted { $0.uuidString < $1.uuidString }
+            .map { "\($0.uuidString):\(glyphKeys[$0] ?? "")" }
+            .joined(separator: "|")
+    }
 
     private func setGlyph(_ item: NSStatusItem, id: UUID, key: String, make: () -> NSImage?) {
         guard let button = item.button else { return }
@@ -79,6 +93,9 @@ final class ExtrasManager {
     /// Which Focus is on, alive while a Focus item exists.
     private var focusStatus: FocusStatus?
     private var lastFocusActive = false
+    /// Whether a SharePlay session with no call is live, alive while a
+    /// Camera & mic item exists.
+    private var sharePlayStatus: SharePlayStatus?
     /// One clock per media item drawing the animated bars (see ExtraGlyphs).
     private var animators: [UUID: ExtraAnimator] = [:]
     /// Play/pause state the media glyph shows. Click intent drives it (players
@@ -226,6 +243,17 @@ final class ExtrasManager {
             status.stop()
             focusStatus = nil
         }
+        if newSpecs.contains(where: { $0.kind == .cameraMicIndicator }) {
+            if sharePlayStatus == nil {
+                let status = SharePlayStatus()
+                status.onChange = { [weak self] in self?.applyCurrent() }
+                sharePlayStatus = status
+                status.start()
+            }
+        } else if let status = sharePlayStatus {
+            status.stop()
+            sharePlayStatus = nil
+        }
         let needsCameraMonitor = newSpecs.contains {
             $0.kind == .cameraMicIndicator || $0.kind == .mediaControls
         }
@@ -258,10 +286,11 @@ final class ExtrasManager {
             switch spec.kind {
             case .cameraMicIndicator:
                 // Pure indicator, like Apple's: exists ONLY while hardware is
-                // live (section decides where it appears, not whether). Defers
-                // to the system pill when that one is on screen.
-                let active = cameraMicMonitor?.isActive ?? false
-                visible = active && !systemCameraPillVisible
+                // live, or a SharePlay session with no call (section decides
+                // where it appears, not whether). Defers to the system pill,
+                // or Apple's SharePlay icon, when that one is on screen.
+                let active = (cameraMicMonitor?.isActive ?? false) || (sharePlayStatus?.isLive ?? false)
+                visible = active && !systemCameraPillVisible && !(appState?.systemSharePlayVisible ?? false)
                 updateCameraSymbol(item, spec: spec)
                 // Re-entering layout (isVisible flip) parks the item wherever
                 // the agent decides, not at its model slot. Never drag here:
@@ -400,7 +429,7 @@ final class ExtrasManager {
                     appState?.cancelOwnItemPlacement(itemID)
                 }
                 lastFocusActive = active
-            case .shortcut, .userSwitching, .siri:
+            case .shortcut, .userSwitching, .shortcutsMenu, .siri:
                 break
             }
             setVisible(visible, for: id, item: item)
@@ -445,7 +474,7 @@ final class ExtrasManager {
         for (id, item) in items {
             guard let spec = specs[id], lastVisible[id] != true else { continue }
             switch spec.kind {
-            case .airdrop, .shortcut, .userSwitching, .siri: break
+            case .airdrop, .shortcut, .userSwitching, .shortcutsMenu, .siri: break
             case .timer:
                 // Counting: already in the bar on its own.
                 guard !(pelmetTimer?.isActive ?? false) else { continue }
@@ -585,6 +614,7 @@ final class ExtrasManager {
         case .appLauncher: spec.symbol ?? "app.dashed"
         case .timer: "timer"
         case .userSwitching: "person.crop.circle"
+        case .shortcutsMenu: "square.2.layers.3d.top.filled"
         case .timeMachine: ExtraGlyph.timeMachineSymbol
         case .siri: "siri"
         case .focus: "moon.fill"
@@ -824,7 +854,7 @@ final class ExtrasManager {
         case .timer: updateTimerGlyph(item, spec: spec)
         case .timeMachine: updateTimeMachineGlyph(item, spec: spec)
         case .focus: updateFocusGlyph(item, spec: spec)
-        case .shortcut, .appLauncher, .userSwitching, .siri: break
+        case .shortcut, .appLauncher, .userSwitching, .shortcutsMenu, .siri: break
         }
     }
 
@@ -941,7 +971,11 @@ final class ExtrasManager {
         let monitor = cameraMicMonitor
         let camera = monitor?.cameraActive ?? false
         let mic = monitor?.micActive ?? false
-        let symbol = camera ? "video.fill" : (mic ? "mic.fill" : "video.fill")
+        // SharePlay with no call: the pill wears its glyph, even with the
+        // camera up (FaceTime's open window keeps it running); the colour
+        // stays the privacy signal, plain when nothing records.
+        let sharePlay = sharePlayStatus?.isLive ?? false
+        let symbol = sharePlay ? "shareplay" : (camera ? "video.fill" : (mic ? "mic.fill" : "video.fill"))
         let key = "camera:\(symbol):\(camera):\(mic)"
         guard glyphKeys[spec.id] != key || item.button?.image == nil else { return }
         let image = NSImage(systemSymbolName: symbol, accessibilityDescription: String(localized: "Camera & Mic"))
@@ -957,13 +991,73 @@ final class ExtrasManager {
 
     // MARK: Actions
 
+    /// The item's own spot (global, top-left origin): the Apple item to
+    /// press is the copy on this item's display.
+    private static func barPoint(of sender: NSStatusBarButton) -> CGPoint {
+        let frame = sender.window?.frame ?? .zero
+        return CGPoint(x: frame.midX, y: (NSScreen.screens.first?.frame.maxY ?? 0) - frame.midY)
+    }
+
     @objc private func clicked(_ sender: NSStatusBarButton) {
         guard
             let statusItem = items.first(where: { $0.value.button === sender }),
             let spec = specs[statusItem.key]
         else { return }
-        let rightClick = NSApp.currentEvent?.type == .rightMouseUp
+        perform(spec, on: statusItem, rightClick: NSApp.currentEvent?.type == .rightMouseUp)
+    }
 
+    /// What a press from outside the bar (the command bar, an item's own
+    /// shortcut) needs before `activate` can run the extra's action.
+    enum PressNeed {
+        /// It runs wherever the item is: a media key, a launch, a toggle.
+        case nothing
+        /// It pops a menu from the item's own button, so the item has to be
+        /// on the bar for the menu to anchor.
+        case onBar
+        /// It opens Apple's pill at the item's spot, and only the camera
+        /// being live puts the item there: no section reveal helps.
+        case live
+    }
+
+    /// The extra that has this key; nil for a separator, the chevron, or
+    /// anything that is not one of the extras.
+    private func entry(for key: ItemID) -> (key: UUID, value: NSStatusItem)? {
+        items.first { entry in
+            specs[entry.key].map { Self.itemID(for: $0).sectionKey == key.sectionKey } ?? false
+        }
+    }
+
+    /// Which of `perform`'s presses open a menu from the button, and which
+    /// need the camera live. Keep it in step with `perform`.
+    func pressNeed(itemKey key: ItemID, rightClick: Bool) -> PressNeed? {
+        guard let entry = entry(for: key), let spec = specs[entry.key] else { return nil }
+        switch spec.kind {
+        case .mediaControls, .siri, .focus:
+            return rightClick ? .onBar : .nothing
+        case .cameraMicIndicator:
+            return rightClick ? .nothing : .live
+        case .airdrop, .shortcut:
+            return .nothing
+        case .timer:
+            return pelmetTimer?.state == .done && !rightClick ? .nothing : .onBar
+        case .userSwitching, .shortcutsMenu, .timeMachine:
+            return .onBar
+        case .appLauncher:
+            return rightClick && Self.isRunning(spec) && spec.bundleID != nil ? .onBar : .nothing
+        }
+    }
+
+    /// The action the item's button runs on a click, run directly: no
+    /// click is made on the item. A menu pops from the item when it is on
+    /// the bar, else where the pointer is. False when no extra has this key.
+    @discardableResult
+    func activate(itemKey key: ItemID, rightClick: Bool = false) -> Bool {
+        guard let entry = entry(for: key), let spec = specs[entry.key] else { return false }
+        perform(spec, on: entry, rightClick: rightClick)
+        return true
+    }
+
+    private func perform(_ spec: ExtraItemSpec, on statusItem: (key: UUID, value: NSStatusItem), rightClick: Bool) {
         switch spec.kind {
         case .mediaControls:
             if rightClick {
@@ -979,10 +1073,20 @@ final class ExtrasManager {
                 updateMediaSymbol(statusItem.value, spec: spec)
             }
         case .cameraMicIndicator:
-            // Informational; click opens Privacy settings for a quick audit.
-            NSWorkspace.shared.open(
-                URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")!
-            )
+            // Apple's own pill (video effects, mic mode, Stop Sharing), which
+            // no assertion lets on the bar (#68). A right-click, or no pill
+            // to open, goes to Privacy settings for a quick audit.
+            let privacy = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")!
+            guard !rightClick else { NSWorkspace.shared.open(privacy); return }
+            guard !AudioVideoPill.clickClosedPanel(), let appState, let button = statusItem.value.button else { return }
+            let point = Self.barPoint(of: button)
+            // A SharePlay session with no call: Apple's SharePlay icon first.
+            let ids = (sharePlayStatus?.isLive ?? false)
+                ? [AudioVideoPill.sharePlayIdentifier, AudioVideoPill.identifier]
+                : [AudioVideoPill.identifier]
+            Task { @MainActor in
+                if !(await appState.openAudioVideoPill(near: point, identifiers: ids)) { NSWorkspace.shared.open(privacy) }
+            }
         case .airdrop:
             openAirDrop()
         case .shortcut:
@@ -998,6 +1102,13 @@ final class ExtrasManager {
             }
         case .userSwitching:
             popUp(usersMenu(), on: statusItem.value)
+        case .shortcutsMenu:
+            // Read fresh each open (~15ms a CLI call), off the main thread.
+            Task { @MainActor [weak self] in
+                let library = await Task.detached { Self.shortcutsLibrary() }.value
+                guard let self else { return }
+                popUp(shortcutsMenu(library), on: statusItem.value)
+            }
         case .timeMachine:
             // Fresh for the next open; this one shows what the poll last saw.
             timeMachine?.refresh()
@@ -1041,6 +1152,13 @@ final class ExtrasManager {
     }
 
     private func popUp(_ menu: NSMenu, on item: NSStatusItem) {
+        // An item out of the bar (a press from the command bar while its
+        // section stays concealed) has no spot to anchor to: the menu pops
+        // where the pointer is.
+        guard items.first(where: { $0.value === item }).map({ lastVisible[$0.key] == true }) ?? false else {
+            menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+            return
+        }
         item.menu = menu
         item.button?.performClick(nil)
         item.menu = nil
@@ -1158,6 +1276,47 @@ final class ExtrasManager {
     @objc private func lockScreen() { UserSwitching.lockScreen() }
     @objc private func usersSettings() { UserSwitching.openUsersSettings() }
 
+    /// Unfiled shortcuts first, in library order, then each folder as a
+    /// submenu. Entries run by identifier: two shortcuts can share a name.
+    private func shortcutsMenu(_ library: ShortcutsLibrary) -> NSMenu {
+        let menu = NSMenu()
+        func entry(_ shortcut: ShortcutsLibrary.Entry) -> NSMenuItem {
+            let item = NSMenuItem(title: shortcut.name, action: #selector(runMenuShortcut(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = shortcut.id
+            return item
+        }
+        if library.isEmpty {
+            let none = NSMenuItem(title: String(localized: "No shortcuts in your library"), action: nil, keyEquivalent: "")
+            none.isEnabled = false
+            menu.addItem(none)
+        }
+        for shortcut in library.unfiled { menu.addItem(entry(shortcut)) }
+        if !library.unfiled.isEmpty, !library.folders.isEmpty { menu.addItem(.separator()) }
+        for folder in library.folders {
+            let sub = NSMenu()
+            for shortcut in folder.shortcuts { sub.addItem(entry(shortcut)) }
+            let item = NSMenuItem(title: folder.name, action: nil, keyEquivalent: "")
+            item.submenu = sub
+            menu.addItem(item)
+        }
+        menu.addItem(.separator())
+        let open = NSMenuItem(title: String(localized: "Open Shortcuts"), action: #selector(openShortcutsApp), keyEquivalent: "")
+        open.target = self
+        menu.addItem(open)
+        return menu
+    }
+
+    @objc private func runMenuShortcut(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        runShortcut(named: id)
+    }
+
+    @objc private func openShortcutsApp() {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.shortcuts") else { return }
+        NSWorkspace.shared.openApplication(at: url, configuration: .init())
+    }
+
     // MARK: Time Machine menu
 
     /// Apple's menu, line for line: the state on top, then the verbs.
@@ -1223,9 +1382,7 @@ final class ExtrasManager {
     @objc private func browseBackups() { TimeMachineBackup.browseBackups() }
     @objc private func timeMachineSettings() { TimeMachineBackup.openSettings() }
     @objc private func siriSettings() { Siri.openSettings() }
-    @objc private func focusSettings() {
-        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Focus-Settings.extension")!)
-    }
+    @objc private func focusSettings() { ControlCenterFocus.openSettings() }
 
     private func openAirDrop() {
         // Finder's AirDrop view via its keyboard shortcut (⇧⌘R) — the only
@@ -1264,9 +1421,26 @@ final class ExtrasManager {
 
     /// Names from the user's Shortcuts library (for the picker).
     nonisolated static func availableShortcuts() -> [String] {
+        shortcutsCLI(["list"])
+    }
+
+    /// The library as the Shortcuts CLI sees it: real folders only (the
+    /// Share Sheet / Menu Bar collections are not folders to it).
+    nonisolated static func shortcutsLibrary() -> ShortcutsLibrary {
+        func entries(in folder: String) -> [ShortcutsLibrary.Entry] {
+            shortcutsCLI(["list", "--folder-name", folder, "--show-identifiers"]).compactMap(ShortcutsLibrary.Entry.init(line:))
+        }
+        let folders = shortcutsCLI(["list", "--folders"])
+            .filter { $0 != "none" }
+            .map { (name: $0, shortcuts: entries(in: $0)) }
+            .filter { !$0.shortcuts.isEmpty }
+        return ShortcutsLibrary(unfiled: entries(in: "none"), folders: folders)
+    }
+
+    private nonisolated static func shortcutsCLI(_ arguments: [String]) -> [String] {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/shortcuts")
-        process.arguments = ["list"]
+        process.arguments = arguments
         let pipe = Pipe()
         process.standardOutput = pipe
         guard (try? process.run()) != nil else { return [] }
@@ -1279,6 +1453,30 @@ final class ExtrasManager {
             .map(String.init)
             .filter { !$0.isEmpty }
     }
+}
+
+// MARK: - Shortcuts library
+
+/// What the Shortcuts menu lists, read through `/usr/bin/shortcuts`.
+nonisolated struct ShortcutsLibrary: Sendable {
+    struct Entry: Sendable {
+        let name: String
+        let id: String
+
+        /// One `list --show-identifiers` line: `Name (UUID)`.
+        init?(line: String) {
+            guard line.hasSuffix(")"), let open = line.lastIndex(of: "(") else { return nil }
+            let id = String(line[line.index(after: open)..<line.index(before: line.endIndex)])
+            guard UUID(uuidString: id) != nil else { return nil }
+            self.name = String(line[..<open]).trimmingCharacters(in: .whitespaces)
+            self.id = id
+        }
+    }
+
+    var unfiled: [Entry]
+    var folders: [(name: String, shortcuts: [Entry])]
+
+    var isEmpty: Bool { unfiled.isEmpty && folders.isEmpty }
 }
 
 // MARK: - Camera / mic activity

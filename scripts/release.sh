@@ -16,12 +16,6 @@ BUILD_DIR="$REPO_ROOT/build/release"
 RELEASES_DIR="$REPO_ROOT/build/releases"   # generate_appcast scans this dir
 NOTARY_PROFILE="${NOTARY_PROFILE:-nook-notary}"
 
-# macOS 27 SDK lives in the beta Xcode on the dev machine; CI xcode-selects
-# its own, so only default when the beta install is actually present.
-if [[ -z "${DEVELOPER_DIR:-}" && -d /Applications/Xcode-beta.app ]]; then
-    export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
-fi
-
 # project.yml carries MARKETING_VERSION twice (app target + the helper
 # template); they must agree, and one line is all the release name gets.
 VERSIONS=$(sed -n 's/^ *MARKETING_VERSION: "\(.*\)"/\1/p' project.yml | sort -u)
@@ -98,6 +92,18 @@ if [[ -n "$GENERATE_APPCAST" ]]; then
     # (both names: nook-era DMGs still live in the releases dir and the appcast)
     perl -pi -e 's#(releases/download/)v[\w.-]+/((?:Nook|Pelmet)-([\w.-]+)\.dmg)#$1v$3/$2#g' \
         "$RELEASES_DIR/appcast.xml"
+    # Same for deltas: PelmetNN-MM.delta lives on the release of build NN,
+    # whose tag comes from the item carrying <sparkle:version>NN.
+    perl -0777 -pi -e '
+        my %tag;
+        while (/<item>(.*?)<\/item>/sg) {
+            my $item = $1;
+            my ($build) = $item =~ m#<sparkle:version>([^<]+)<#;
+            my ($short) = $item =~ m#<sparkle:shortVersionString>([^<]+)<#;
+            $tag{$build} = "v$short" if defined $build && defined $short;
+        }
+        s#(releases/download/)v[\w.-]+/(Pelmet(\d+)-\d+\.delta)#exists $tag{$3} ? "$1$tag{$3}/$2" : $&#ge;
+    ' "$RELEASES_DIR/appcast.xml"
     echo "==> Appcast written to $RELEASES_DIR/appcast.xml (prior-version URLs re-pointed)"
 else
     echo "warning: generate_appcast not found in DerivedData — build the app once so SPM fetches Sparkle, or download the Sparkle release tools" >&2

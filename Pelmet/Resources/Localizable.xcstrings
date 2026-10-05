@@ -1,6 +1,64 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%@ already opens %@. Press a different combination.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ öffnet bereits %@. Drücke eine andere Kombination."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ya abre %@. Pulsa otra combinación."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ouvre déjà %@. Appuyez sur une autre combinaison."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ apre già %@. Premi un’altra combinazione."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ はすでに %@ を開きます。別の組み合わせを押してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 는 이미 %@ 을(를) 엽니다. 다른 조합을 누르세요."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ já abre %@. Pressione outra combinação."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ уже открывает %@. Нажмите другое сочетание."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 已用于打开 %@。请按其他组合。"
+          }
+        }
+      }
+    },
     "%@ ignores the moves Pelmet makes in the bar, so it keeps its own spot. Hold ⌘ and drag it yourself, or give it a launcher.": {
       "localizations": {
         "de": {
@@ -55,6 +113,64 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ 会忽略 Pelmet 在菜单栏中的移动，保持自己的位置。按住 ⌘ 自行拖动，或为它添加一个启动器。"
+          }
+        }
+      }
+    },
+    "%@ is already Pelmet's shortcut for “%@”. Press a different combination.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ist bereits das Pelmet-Kürzel für „%@“. Drücke eine andere Kombination."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ya es el atajo de Pelmet para «%@». Pulsa otra combinación."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ est déjà le raccourci de Pelmet pour « %@ ». Appuyez sur une autre combinaison."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ è già la scorciatoia di Pelmet per «%@». Premi un’altra combinazione."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ はすでに Pelmet の「%@」のショートカットです。別の組み合わせを押してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 는 이미 Pelmet의 “%@” 단축키입니다. 다른 조합을 누르세요."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ já é o atalho do Pelmet para “%@”. Pressione outra combinação."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ уже используется в Pelmet для «%@». Нажмите другое сочетание."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 已是 Pelmet 的“%@”快捷键。请按其他组合。"
           }
         }
       }
@@ -233,6 +349,238 @@
         }
       }
     },
+    "%@, always hidden": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, immer ausgeblendet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, siempre oculto"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, toujours masqué"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, sempre nascosto"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@、常に非表示"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, 항상 숨김"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, sempre oculto"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, всегда скрыто"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@，始终隐藏"
+          }
+        }
+      }
+    },
+    "%@, hidden": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, ausgeblendet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, oculto"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, masqué"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, nascosto"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@、非表示"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, 숨김"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, oculto"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, скрыто"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@，已隐藏"
+          }
+        }
+      }
+    },
+    "%@, not running": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, nicht geöffnet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, no está abierta"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, non ouverte"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, non in esecuzione"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@、起動していません"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, 실행 중이 아님"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, não está aberto"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, не запущено"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@，未运行"
+          }
+        }
+      }
+    },
+    "%@, setting in %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, Einstellung unter %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, ajuste en %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, réglage dans %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, impostazione in %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@、%@の設定"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, %@의 설정"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, ajuste em %@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, настройка в разделе «%@»"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@，位于%@的设置"
+          }
+        }
+      }
+    },
     "%lld hours": {
       "localizations": {
         "de": {
@@ -349,6 +697,122 @@
         }
       }
     },
+    "%lld not moved": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld nicht verschoben"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld sin mover"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld non déplacé(s)"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld non spostati"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 個未移動"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld개 이동 안 됨"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld não movido(s)"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не перемещено: %lld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个未移动"
+          }
+        }
+      }
+    },
+    "%lld results": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld Ergebnisse"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld resultados"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld résultats"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld risultati"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld件の結果"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "결과 %lld개"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld resultados"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Результатов: %lld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个结果"
+          }
+        }
+      }
+    },
     "%lld stars": {
       "localizations": {
         "de": {
@@ -461,6 +925,64 @@
           "stringUnit": {
             "state": "translated",
             "value": "1 小时"
+          }
+        }
+      }
+    },
+    "1 result": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 Ergebnis"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 resultado"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 résultat"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 risultato"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1件の結果"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "결과 1개"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 resultado"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Результатов: 1"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 个结果"
           }
         }
       }
@@ -808,7 +1330,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "辅助功能"
+            "value": "无障碍"
           }
         }
       }
@@ -866,7 +1388,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "辅助功能访问已关闭。开启…"
+            "value": "无障碍访问已关闭。开启…"
           }
         }
       }
@@ -924,7 +1446,65 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "辅助功能是 Pelmet 识别并移动图标的方式，数据不会离开你的 Mac。屏幕录制是可选的：它让 Pelmet 的动画样式覆盖在 macOS 显示和隐藏图标的方式之上。不会录制或保存任何内容。"
+            "value": "无障碍权限是 Pelmet 识别并移动图标的方式，数据不会离开你的 Mac。录屏是可选的：它让 Pelmet 的动画样式覆盖在 macOS 显示和隐藏图标的方式之上。不会录制或保存任何内容。"
+          }
+        }
+      }
+    },
+    "Actions for %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktionen für %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acciones para %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actions pour %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Azioni per %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ の操作"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 동작"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ações para %@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Действия для %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 的操作"
           }
         }
       }
@@ -1041,6 +1621,64 @@
           "stringUnit": {
             "state": "translated",
             "value": "活跃的应用程序"
+          }
+        }
+      }
+    },
+    "Add Alias…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alias hinzufügen …"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Añadir alias…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajouter un alias…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi alias…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "別名を追加…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "별칭 추가…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adicionar apelido…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Добавить псевдоним…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加别名…"
           }
         }
       }
@@ -1562,7 +2200,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一键打开 AirDrop。"
+            "value": "一键打开隔空投送。"
           }
         }
       }
@@ -1620,7 +2258,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "允许屏幕录制"
+            "value": "允许录屏"
           }
         }
       }
@@ -2085,6 +2723,64 @@
           "stringUnit": {
             "state": "translated",
             "value": "动画"
+          }
+        }
+      }
+    },
+    "Another app already uses %@. Press a different combination.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eine andere App verwendet %@ bereits. Drücke eine andere Kombination."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Otra app ya usa %@. Pulsa otra combinación."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une autre app utilise déjà %@. Appuyez sur une autre combinaison."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un’altra app usa già %@. Premi un’altra combinazione."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "別のアプリがすでに %@ を使っています。別の組み合わせを押してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다른 앱에서 이미 %@ 를 사용합니다. 다른 조합을 누르세요."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Outro app já usa %@. Pressione outra combinação."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Другое приложение уже использует %@. Нажмите другое сочетание."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "另一个 App 已使用 %@。请按其他组合。"
           }
         }
       }
@@ -2634,7 +3330,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Esegui backup adesso"
+            "value": "Esegui il backup adesso"
           }
         },
         "ja": {
@@ -3249,6 +3945,64 @@
         }
       }
     },
+    "Change Shortcut…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kürzel ändern …"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cambiar atajo…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifier le raccourci…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cambia scorciatoia…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ショートカットを変更…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "단축키 변경…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alterar atalho…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Изменить сочетание…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更改快捷键…"
+          }
+        }
+      }
+    },
     "Change icon": {
       "localizations": {
         "de": {
@@ -3303,6 +4057,64 @@
           "stringUnit": {
             "state": "translated",
             "value": "更改图标"
+          }
+        }
+      }
+    },
+    "Check for Updates": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nach Updates suchen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar actualizaciones"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rechercher des mises à jour"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerca aggiornamenti"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アップデートを確認"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업데이트 확인"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar atualizações"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Проверить обновления"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查更新"
           }
         }
       }
@@ -4356,25 +5168,25 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ausblenden"
+            "value": "Schließen"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Descartar"
+            "value": "Cerrar"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ignorer"
+            "value": "Fermer"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ignora"
+            "value": "Chiudi"
           }
         },
         "ja": {
@@ -4392,7 +5204,7 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dispensar"
+            "value": "Descartar"
           }
         },
         "ru": {
@@ -4931,6 +5743,122 @@
         }
       }
     },
+    "Edit Alias…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alias bearbeiten …"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editar alias…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifier l’alias…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifica alias…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "別名を編集…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "별칭 편집…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editar apelido…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Изменить псевдоним…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编辑别名…"
+          }
+        }
+      }
+    },
+    "Edit Layout": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anordnung bearbeiten"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editar disposición"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifier la disposition"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifica disposizione"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配置を編集"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "배치 편집"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editar disposição"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Изменить раскладку"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编辑布局"
+          }
+        }
+      }
+    },
     "Enjoy the extra room up there.": {
       "localizations": {
         "de": {
@@ -4985,6 +5913,64 @@
           "stringUnit": {
             "state": "translated",
             "value": "享受上面多出来的空间吧。"
+          }
+        }
+      }
+    },
+    "Everything at once, press again to hide it all.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alles auf einmal, erneut drücken blendet alles aus."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todo a la vez, pulsa de nuevo para ocultarlo todo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tout d'un coup, appuyez à nouveau pour tout masquer."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutto insieme, premi di nuovo per nascondere tutto."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "すべてを一度に表示。もう一度押すとすべて隠します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "한 번에 모두 표시, 다시 누르면 모두 숨깁니다."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tudo de uma vez, pressione de novo para ocultar tudo."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Всё сразу, нажмите ещё раз, чтобы всё скрыть."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一次显示全部，再按一次全部隐藏。"
           }
         }
       }
@@ -5122,7 +6108,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Changement rapide d’utilisateur"
+            "value": "Permutation d’utilisateur"
           }
         },
         "it": {
@@ -5159,6 +6145,64 @@
           "stringUnit": {
             "state": "translated",
             "value": "快速用户切换"
+          }
+        }
+      }
+    },
+    "Filter actions": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktionen filtern"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtrar acciones"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtrer les actions"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtra azioni"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "操作を絞り込む"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "동작 필터링"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtrar ações"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Фильтр действий"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "筛选操作"
           }
         }
       }
@@ -5284,25 +6328,25 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Fokus-Einstellungen …"
+            "value": "Fokuseinstellungen …"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ajustes de concentración…"
+            "value": "Ajustes de modos de concentración…"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Réglages de Concentration…"
+            "value": "Réglages Concentration…"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Impostazioni Full immersion…"
+            "value": "Impostazioni “Full immersion”…"
           }
         },
         "ja": {
@@ -5395,6 +6439,64 @@
         }
       }
     },
+    "Forget": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vergessen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Olvidar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oublier"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dimentica"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "履歴から削除"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기록 지우기"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esquecer"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Забыть"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除记录"
+          }
+        }
+      }
+    },
     "Forget the pending order changes; the editor shows the bar as it is": {
       "localizations": {
         "de": {
@@ -5449,6 +6551,64 @@
           "stringUnit": {
             "state": "translated",
             "value": "放弃待应用的顺序更改；编辑器按当前菜单栏显示"
+          }
+        }
+      }
+    },
+    "Forgets which icons you open and what you typed to find them. Shortcuts and aliases stay.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vergisst, welche Symbole du öffnest und was du dafür getippt hast. Kürzel und Aliasse bleiben."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Olvida qué iconos abres y qué escribiste para encontrarlos. Los atajos y alias se conservan."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oublie les icônes que vous ouvrez et ce que vous avez tapé pour les trouver. Raccourcis et alias restent."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dimentica quali icone apri e cosa hai digitato per trovarle. Scorciatoie e alias restano."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "どのアイコンを開いたか、何を入力して探したかを消去します。ショートカットと別名はそのまま残ります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "어떤 아이콘을 열었는지, 찾으려고 무엇을 입력했는지 지웁니다. 단축키와 별칭은 그대로 유지됩니다."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esquece quais ícones você abre e o que digitou para achá-los. Atalhos e apelidos permanecem."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Забывает, какие значки вы открывали и что вводили для поиска. Сочетания и псевдонимы остаются."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除你打开过哪些图标以及搜索时输入的内容。快捷键和别名会保留。"
           }
         }
       }
@@ -5806,13 +6966,13 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dauerhaft weg, außer bei Doppelklick oder ⌥-Klick auf das Chevron"
+            "value": "Dauerhaft weg, außer bei Doppelklick oder ⌥-Klick auf den Chevron"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ocultos del todo, salvo con doble clic o ⌥-clic en el chevron"
+            "value": "Ocultos del todo, salvo con doble clic o ⌥-clic en el chevrón"
           }
         },
         "fr": {
@@ -5854,7 +7014,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "彻底隐藏，除非双击或 ⌥-点击 V 形符号"
+            "value": "彻底隐藏，除非双击或 ⌥-点击尖角符号"
           }
         }
       }
@@ -5912,7 +7072,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "授予辅助功能权限"
+            "value": "授予无障碍权限"
           }
         }
       }
@@ -6319,6 +7479,64 @@
           "stringUnit": {
             "state": "translated",
             "value": "此 macOS 版本不支持隐藏，但仍可重新排序。"
+          }
+        }
+      }
+    },
+    "Hold ⌘, ⌥ or ⌃ with the key, so it doesn't type into other apps.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Halte ⌘, ⌥ oder ⌃ zusammen mit der Taste gedrückt, sonst tippt sie in anderen Apps."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mantén ⌘, ⌥ o ⌃ con la tecla, para que no escriba en otras apps."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Maintenez ⌘, ⌥ ou ⌃ avec la touche, sinon elle écrirait dans les autres apps."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tieni premuto ⌘, ⌥ o ⌃ insieme al tasto, altrimenti scriverebbe nelle altre app."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌘、⌥、⌃ のいずれかを押しながら入力してください。そうしないと他のアプリに文字が入力されてしまいます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌘, ⌥ 또는 ⌃ 를 함께 누르세요. 그렇지 않으면 다른 앱에 입력됩니다."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Segure ⌘, ⌥ ou ⌃ junto com a tecla, para que ela não digite em outros apps."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Зажмите ⌘, ⌥ или ⌃ вместе с клавишей, иначе она будет печатать в других приложениях."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请同时按住 ⌘、⌥ 或 ⌃，否则该键会在其他 App 中输入字符。"
           }
         }
       }
@@ -7135,60 +8353,118 @@
         }
       }
     },
-    "Know when your camera or mic is on.": {
+    "Know when your camera, mic or SharePlay is on.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Wisse, wann Kamera oder Mikrofon an sind."
+            "value": "Wisse, wann Kamera, Mikrofon oder SharePlay an sind."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sabe cuándo tu cámara o micrófono están activos."
+            "value": "Sabe cuándo tu cámara, micrófono o SharePlay están activos."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sachez quand votre caméra ou votre micro est actif."
+            "value": "Sachez quand votre caméra, votre micro ou SharePlay est actif."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sai quando la fotocamera o il microfono sono attivi."
+            "value": "Sai quando la fotocamera, il microfono o SharePlay sono attivi."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "カメラやマイクがオンのときにわかります。"
+            "value": "カメラ、マイク、SharePlayがオンのときにわかります。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "카메라나 마이크가 켜져 있을 때 알 수 있습니다."
+            "value": "카메라, 마이크 또는 SharePlay가 켜져 있을 때 알 수 있습니다."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Saiba quando sua câmera ou microfone estão ligados."
+            "value": "Saiba quando sua câmera, microfone ou SharePlay estão ligados."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Знайте, когда включены камера или микрофон."
+            "value": "Знайте, когда включены камера, микрофон или SharePlay."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "随时知道摄像头或麦克风是否开启。"
+            "value": "随时知道摄像头、麦克风或同播共享是否开启。"
+          }
+        }
+      }
+    },
+    "Know when your camera, mic or SharePlay is on. Without Screen Recording the hidden icons flash by for an instant when you click it.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wisse, wann Kamera, Mikrofon oder SharePlay an sind. Ohne Bildschirmaufnahme blitzen die ausgeblendeten Symbole beim Klick kurz auf."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sabe cuándo tu cámara, micrófono o SharePlay están activos. Sin Grabación de pantalla, los iconos ocultos aparecen un instante al hacer clic."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sachez quand votre caméra, votre micro ou SharePlay est actif. Sans Enregistrement de l'écran, les icônes masquées apparaissent un instant au clic."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sai quando la fotocamera, il microfono o SharePlay sono attivi. Senza Registrazione schermo le icone nascoste compaiono per un istante al clic."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カメラ、マイク、SharePlayがオンのときにわかります。画面収録がないと、クリック時に隠れたアイコンが一瞬映ります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "카메라, 마이크 또는 SharePlay가 켜져 있을 때 알 수 있습니다. 화면 기록 권한이 없으면 클릭할 때 숨긴 아이콘이 잠깐 스쳐 보입니다."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saiba quando sua câmera, microfone ou SharePlay estão ligados. Sem Gravação de Tela, os ícones ocultos aparecem por um instante ao clicar."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Знайте, когда включены камера, микрофон или SharePlay. Без записи экрана при щелчке скрытые значки мелькают на мгновение."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "随时知道摄像头、麦克风或同播共享是否开启。没有录屏权限时，点击它会让隐藏的图标闪现一下。"
           }
         }
       }
@@ -7720,7 +8996,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Anmeldefenster…"
+            "value": "Anmeldefenster …"
           }
         },
         "es": {
@@ -7732,7 +9008,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Fenêtre de connexion…"
+            "value": "Fenêtre d’ouverture de session…"
           }
         },
         "it": {
@@ -7756,7 +9032,7 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Janela de login…"
+            "value": "Janela de Início de Sessão…"
           }
         },
         "ru": {
@@ -8116,123 +9392,181 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "让菜单栏与编辑器一致：按你的顺序，并把每个图标放到箭头上其分区所在的一侧。每个图标在隐藏光标的情况下只拖动一次；按下之前不会移动任何内容。"
+            "value": "让菜单栏与编辑器一致：按你的顺序，并把每个图标放到尖角符号上其分区所在的一侧。每个图标在隐藏光标的情况下只拖动一次；按下之前不会移动任何内容。"
           }
         }
       }
     },
-    "Moved %lld": {
+    "Move to Always Hidden": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld verschoben"
+            "value": "Nach „Immer ausgeblendet“ verschieben"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld movido(s)"
+            "value": "Mover a Siempre ocultos"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld déplacé(s)"
+            "value": "Déplacer vers Toujours masqués"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld spostati"
+            "value": "Sposta in Sempre nascosti"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 個移動"
+            "value": "「常に非表示」へ移動"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld개 이동됨"
+            "value": "‘항상 숨김’으로 이동"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld movido(s)"
+            "value": "Mover para Sempre ocultos"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Перемещено: %lld"
+            "value": "Переместить в «Всегда скрытые»"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已移动 %lld 个"
+            "value": "移到“始终隐藏”"
           }
         }
       }
     },
-    "Moved %lld, %lld not moved": {
+    "Move to Hidden": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld verschoben, %lld nicht verschoben"
+            "value": "Nach „Ausgeblendet“ verschieben"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld movido(s), %lld sin mover"
+            "value": "Mover a Ocultos"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld déplacé(s), %lld non déplacé(s)"
+            "value": "Déplacer vers Masqués"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld spostati, %lld non spostati"
+            "value": "Sposta in Nascosti"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 個移動、%lld 個未移動"
+            "value": "「非表示」へ移動"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld개 이동됨, %lld개 이동 안 됨"
+            "value": "‘숨김’으로 이동"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld movido(s), %lld não movido(s)"
+            "value": "Mover para Ocultos"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Перемещено: %lld, не перемещено: %lld"
+            "value": "Переместить в «Скрытые»"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已移动 %lld 个，%lld 个未移动"
+            "value": "移到“隐藏”"
+          }
+        }
+      }
+    },
+    "Move to Visible": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nach „Sichtbar“ verschieben"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mover a Visibles"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Déplacer vers Visibles"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sposta in Visibili"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「表示」へ移動"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "‘표시’로 이동"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mover para Visíveis"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Переместить в «Видимые»"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移到“可见”"
           }
         }
       }
@@ -8527,6 +9861,64 @@
         }
       }
     },
+    "No results": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Ergebnisse"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin resultados"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun résultat"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun risultato"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "結果なし"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "결과 없음"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhum resultado"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ничего не найдено"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无结果"
+          }
+        }
+      }
+    },
     "No shortcuts in your library": {
       "localizations": {
         "de": {
@@ -8638,7 +10030,65 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "尚未就位——它随此分区隐藏，但在应用之前仍位于箭头另一侧"
+            "value": "尚未就位——它随此分区隐藏，但在应用之前仍位于尖角符号另一侧"
+          }
+        }
+      }
+    },
+    "Not running": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht geöffnet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No está abierta"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non ouverte"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non in esecuzione"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "起動していません"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행 중이 아님"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não está aberto"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не запущено"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未运行"
           }
         }
       }
@@ -8697,6 +10147,64 @@
           "stringUnit": {
             "state": "translated",
             "value": "刘海"
+          }
+        }
+      }
+    },
+    "Nothing to reset yet. Pelmet learns from the icons you open with Search.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Noch nichts zurückzusetzen. Pelmet lernt aus den Symbolen, die du mit der Suche öffnest."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aún no hay nada que restablecer. Pelmet aprende de los iconos que abres con la búsqueda."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rien à réinitialiser pour l’instant. Pelmet apprend des icônes que vous ouvrez avec la recherche."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora niente da ripristinare. Pelmet impara dalle icone che apri con la ricerca."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リセットするものはまだありません。検索で開いたアイコンから Pelmet が学習します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아직 재설정할 내용이 없습니다. 검색으로 연 아이콘을 바탕으로 Pelmet이 학습합니다."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nada para redefinir ainda. O Pelmet aprende com os ícones que você abre pela busca."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Пока нечего сбрасывать. Pelmet учится на значках, которые вы открываете через поиск."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂无可重置的内容。Pelmet 会从你通过搜索打开的图标中学习。"
           }
         }
       }
@@ -8812,7 +10320,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "即使图标已隐藏，点击时钟仍能打开通知中心。Pelmet 会处理这次点击；没有屏幕录制权限时，隐藏的图标会闪现一下。关闭后，从触控板右边缘双指轻扫仍然有效。"
+            "value": "即使图标已隐藏，点击时钟仍能打开通知中心。Pelmet 会处理这次点击；没有录屏权限时，隐藏的图标会闪现一下。关闭后，从触控板右边缘双指轻扫仍然有效。"
           }
         }
       }
@@ -9107,6 +10615,180 @@
         }
       }
     },
+    "Open %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ öffnen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ を開く"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 열기"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir %@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Открыть %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开 %@"
+          }
+        }
+      }
+    },
+    "Open Menu": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menü öffnen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir menú"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir le menu"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri menu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "メニューを開く"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메뉴 열기"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir menu"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Открыть меню"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开菜单"
+          }
+        }
+      }
+    },
+    "Open Notification Center": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mitteilungszentrale öffnen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir el Centro de notificaciones"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir le Centre de notifications"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri il Centro Notifiche"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知センターを開く"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "알림 센터 열기"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir a Central de Notificações"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Открыть Центр уведомлений"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开通知中心"
+          }
+        }
+      }
+    },
     "Open Pelmet at login": {
       "localizations": {
         "de": {
@@ -9223,24 +10905,82 @@
         }
       }
     },
-    "Open Time Machine Settings…": {
+    "Open Shortcuts": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Time Machine-Einstellungen öffnen …"
+            "value": "Kurzbefehle öffnen"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Abrir los ajustes de Time Machine…"
+            "value": "Abrir Atajos"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ouvrir les réglages Time Machine…"
+            "value": "Ouvrir Raccourcis"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri Comandi Rapidi"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ショートカットを開く"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "단축어 열기"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir Atalhos"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Открыть «Быстрые команды»"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开快捷指令"
+          }
+        }
+      }
+    },
+    "Open Time Machine Settings…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Time Machine-Einstellungen öffnen …"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir los ajustes de Time Machine…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir les réglages Time Machine…"
           }
         },
         "it": {
@@ -9258,7 +10998,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Time Machine 설정 열기…"
+            "value": "Time Machine 설정 열기…"
           }
         },
         "pt-BR": {
@@ -9270,7 +11010,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Открыть настройки Time Machine…"
+            "value": "Открыть настройки Time Machine…"
           }
         },
         "zh-Hans": {
@@ -9518,7 +11258,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Anhalten"
+            "value": "Pause"
           }
         },
         "es": {
@@ -10673,6 +12413,122 @@
         }
       }
     },
+    "Press the new shortcut. ⎋ cancels.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neues Kürzel drücken. ⎋ bricht ab."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulsa el nuevo atajo. ⎋ cancela."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appuyez sur le nouveau raccourci. ⎋ annule."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Premi la nuova scorciatoia. ⎋ annulla."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新しいショートカットを押してください。⎋ でキャンセル。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새 단축키를 누르세요. ⎋ 로 취소합니다."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pressione o novo atalho. ⎋ cancela."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нажмите новое сочетание. ⎋ — отмена."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按下新的快捷键。⎋ 取消。"
+          }
+        }
+      }
+    },
+    "Press ↩ to save, ⎋ to cancel. Leave it empty to remove the alias.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "↩ speichert, ⎋ bricht ab. Leer lassen, um den Alias zu entfernen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "↩ guarda, ⎋ cancela. Déjalo vacío para quitar el alias."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "↩ enregistre, ⎋ annule. Laissez vide pour retirer l’alias."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "↩ salva, ⎋ annulla. Lascia vuoto per rimuovere l’alias."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "↩ で保存、⎋ でキャンセル。空にすると別名を削除します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "↩ 로 저장, ⎋ 로 취소합니다. 비워 두면 별칭이 제거됩니다."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "↩ salva, ⎋ cancela. Deixe vazio para remover o apelido."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "↩ — сохранить, ⎋ — отмена. Оставьте поле пустым, чтобы удалить псевдоним."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按 ↩ 保存，⎋ 取消。留空即可移除别名。"
+          }
+        }
+      }
+    },
     "Previous Track": {
       "localizations": {
         "de": {
@@ -11142,7 +12998,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pelmet wird zum Übernehmen neu gestartet."
+            "value": "Pelmet wird neu gestartet, um die Änderung anzuwenden."
           }
         },
         "es": {
@@ -11249,6 +13105,64 @@
           "stringUnit": {
             "state": "translated",
             "value": "移除"
+          }
+        }
+      }
+    },
+    "Remove Shortcut": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kürzel entfernen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminar atajo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer le raccourci"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovi scorciatoia"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ショートカットを削除"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "단축키 제거"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remover atalho"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить сочетание"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除快捷键"
           }
         }
       }
@@ -11485,6 +13399,64 @@
         }
       }
     },
+    "Reset Search History": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suchverlauf zurücksetzen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restablecer historial de búsqueda"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réinitialiser l’historique de recherche"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ripristina cronologia di ricerca"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "検索履歴をリセット"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "검색 기록 재설정"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Redefinir histórico de busca"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сбросить историю поиска"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重置搜索记录"
+          }
+        }
+      }
+    },
     "Restore %@": {
       "localizations": {
         "de": {
@@ -11548,7 +13520,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Fortsetzen"
+            "value": "Weiter"
           }
         },
         "es": {
@@ -11590,7 +13562,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Продолжить"
+            "value": "Возобновить"
           }
         },
         "zh-Hans": {
@@ -12060,7 +14032,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "屏幕录制"
+            "value": "录屏"
           }
         }
       }
@@ -12118,7 +14090,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "屏幕录制已开启"
+            "value": "录屏已开启"
           }
         }
       }
@@ -12181,6 +14153,122 @@
         }
       }
     },
+    "Search the menu bar": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menüleiste durchsuchen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar en la barra de menús"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rechercher dans la barre des menus"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerca nella barra dei menu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "メニューバーを検索"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메뉴 막대 검색"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar na barra de menus"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Поиск по строке меню"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索菜单栏"
+          }
+        }
+      }
+    },
+    "Search…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suchen …"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rechercher…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerca…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "検索…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "검색…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Поиск…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索…"
+          }
+        }
+      }
+    },
     "See which Focus is on and switch it in a click.": {
       "localizations": {
         "de": {
@@ -12228,7 +14316,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Видите, какой фокус включён, и переключаете его одним щелчком."
+            "value": "Видите, какой режим фокусирования включён, и переключаете его одним щелчком."
           }
         },
         "zh-Hans": {
@@ -12355,6 +14443,64 @@
         }
       }
     },
+    "Set Shortcut…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kürzel festlegen …"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Definir atajo…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Définir un raccourci…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imposta scorciatoia…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ショートカットを設定…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "단축키 설정…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Definir atalho…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Задать сочетание…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置快捷键…"
+          }
+        }
+      }
+    },
     "Settled in.": {
       "localizations": {
         "de": {
@@ -12471,6 +14617,64 @@
         }
       }
     },
+    "Shortcuts": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kurzbefehle"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atajos"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raccourcis"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comandi Rapidi"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ショートカット"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "단축어"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atalhos"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Быстрые команды"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快捷指令"
+          }
+        }
+      }
+    },
     "Show Always-Hidden Too": {
       "localizations": {
         "de": {
@@ -12558,7 +14762,7 @@
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "隠した項目を表示"
+            "value": "「非表示」の項目を表示"
           }
         },
         "ko": {
@@ -12641,6 +14845,64 @@
           "stringUnit": {
             "state": "translated",
             "value": "在菜单栏中显示 Pelmet 图标"
+          }
+        }
+      }
+    },
+    "Show in Menu Bar": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In der Menüleiste zeigen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar en la barra de menús"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher dans la barre des menus"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra nella barra dei menu"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "メニューバーに表示"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메뉴 막대에 표시"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar na barra de menus"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Показать в строке меню"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在菜单栏中显示"
           }
         }
       }
@@ -15313,6 +17575,64 @@
         }
       }
     },
+    "Type a few letters, press Return, and you're in that icon's menu.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ein paar Buchstaben tippen, Return drücken, und du bist im Menü des Symbols."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escribe unas letras, pulsa Retorno y estarás en el menú de ese icono."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tapez quelques lettres, appuyez sur Retour, et vous êtes dans le menu de l’icône."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scrivi qualche lettera, premi Invio e sei nel menu di quell’icona."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "数文字入力してReturnを押すだけで、そのアイコンのメニューが開きます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "몇 글자를 입력하고 Return을 누르면 해당 아이콘의 메뉴가 열립니다."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Digite algumas letras, pressione Return e você já está no menu daquele ícone."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Введите пару букв, нажмите Return — и вы в меню нужного значка."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "输入几个字母，按下回车，即可进入该图标的菜单。"
+          }
+        }
+      }
+    },
     "Type shortcut…": {
       "localizations": {
         "de": {
@@ -15898,13 +18218,13 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Einstellungen „Benutzer & Gruppen“…"
+            "value": "Einstellungen „Benutzer:innen & Gruppen“ …"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ajustes de Usuarios y grupos…"
+            "value": "Ajustes de usuarios y grupos…"
           }
         },
         "fr": {
@@ -15916,13 +18236,13 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Impostazioni Utenti e gruppi…"
+            "value": "Impostazioni “Utenti e gruppi”…"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "「ユーザとグループ」設定…"
+            "value": "“ユーザとグループ”設定…"
           }
         },
         "ko": {
@@ -15940,13 +18260,13 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Настройки «Пользователи и группы»…"
+            "value": "Настройки пользователей и групп…"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "“用户与群组”设置…"
+            "value": "用户与群组设置…"
           }
         }
       }
@@ -16763,6 +19083,180 @@
         }
       }
     },
+    "Your own name, like “work”": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dein eigener Name, z. B. „Arbeit“"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu propio nombre, como «trabajo»"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Votre propre nom, comme « travail »"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un tuo nome, come «lavoro»"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自分用の名前（例：「仕事」）"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "나만의 이름, 예: “업무”"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seu próprio nome, como “trabalho”"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Своё название, например «работа»"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自己的名称，例如“工作”"
+          }
+        }
+      }
+    },
+    "Your whole Shortcuts library in one menu.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deine ganze Kurzbefehle-Mediathek in einem Menü."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toda tu biblioteca de Atajos en un solo menú."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toute votre bibliothèque Raccourcis dans un seul menu."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutta la tua libreria di Comandi Rapidi in un solo menu."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ショートカットのライブラリ全体をひとつのメニューに。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "단축어 보관함 전체를 하나의 메뉴로."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toda a sua biblioteca de Atalhos em um só menu."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вся библиотека быстрых команд в одном меню."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整个快捷指令资料库，尽在一个菜单。"
+          }
+        }
+      }
+    },
+    "macOS already uses %@. Press a different combination.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS verwendet %@ bereits. Drücke eine andere Kombination."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS ya usa %@. Pulsa otra combinación."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS utilise déjà %@. Appuyez sur une autre combinaison."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS usa già %@. Premi un’altra combinazione."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ はすでに macOS で使われています。別の組み合わせを押してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS에서 이미 %@ 를 사용합니다. 다른 조합을 누르세요."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O macOS já usa %@. Pressione outra combinação."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS уже использует %@. Нажмите другое сочетание."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS 已使用 %@。请按其他组合。"
+          }
+        }
+      }
+    },
     "macOS dropped Pelmet's accessibility permission, which happens after some updates and reinstalls. Grant it again and everything picks up where it left off.": {
       "localizations": {
         "de": {
@@ -16816,7 +19310,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "macOS 移除了 Pelmet 的辅助功能权限，这在某些更新和重新安装后会发生。重新授予后，一切会从上次的状态继续。"
+            "value": "macOS 移除了 Pelmet 的无障碍权限，这在某些更新和重新安装后会发生。重新授予后，一切会从上次的状态继续。"
           }
         }
       }
@@ -16933,6 +19427,122 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pelmet 请求隐藏时，macOS 仍将它保留在菜单栏中。"
+          }
+        }
+      }
+    },
+    "macOS takes %@ off the bar while anything is hidden, because it runs from outside Applications. Open it from the Applications folder instead.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS nimmt %@ aus der Leiste, solange etwas ausgeblendet ist, weil es außerhalb von „Programme“ läuft. Öffne es stattdessen aus dem Ordner „Programme“."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS quita %@ de la barra mientras haya algo oculto, porque se ejecuta fuera de Aplicaciones. Ábrelo desde la carpeta Aplicaciones."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS retire %@ de la barre tant que quelque chose est masqué, car l’app tourne hors du dossier Applications. Ouvrez-la plutôt depuis le dossier Applications."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS toglie %@ dalla barra finché qualcosa è nascosto, perché gira fuori da Applicazioni. Aprila dalla cartella Applicazioni."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ は「アプリケーション」フォルダの外から実行されているため、何かを隠している間はmacOSがバーから外します。「アプリケーション」フォルダから開いてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@이(가) 응용 프로그램 폴더 밖에서 실행되어, 무언가 숨겨져 있는 동안 macOS가 막대에서 뺍니다. 응용 프로그램 폴더에서 여세요."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O macOS tira %@ da barra enquanto algo estiver oculto, porque ele roda fora de Aplicativos. Abra-o pela pasta Aplicativos."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS убирает %@ из строки, пока что-то скрыто, потому что приложение запущено не из папки «Программы». Откройте его из папки «Программы»."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 在“应用程序”文件夹之外运行，所以只要有图标被隐藏，macOS 就会把它移出菜单栏。请改从“应用程序”文件夹打开它。"
+          }
+        }
+      }
+    },
+    "macOS takes %@ off the bar while anything is hidden, even though Pelmet leaves it visible.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS nimmt %@ aus der Leiste, solange etwas ausgeblendet ist, obwohl Pelmet es sichtbar lässt."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS quita %@ de la barra mientras haya algo oculto, aunque Pelmet lo deje visible."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS retire %@ de la barre tant que quelque chose est masqué, même si Pelmet la laisse visible."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS toglie %@ dalla barra finché qualcosa è nascosto, anche se Pelmet la lascia visibile."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pelmetが表示のままにしていても、何かを隠している間はmacOSが %@ をバーから外します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pelmet이 보이게 두어도, 무언가 숨겨져 있는 동안 macOS가 %@을(를) 막대에서 뺍니다."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O macOS tira %@ da barra enquanto algo estiver oculto, mesmo com o Pelmet deixando-o visível."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS убирает %@ из строки, пока что-то скрыто, хотя Pelmet оставляет его видимым."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只要有图标被隐藏，macOS 就会把 %@ 移出菜单栏，即使 Pelmet 让它保持可见。"
           }
         }
       }

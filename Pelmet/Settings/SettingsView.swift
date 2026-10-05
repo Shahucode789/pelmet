@@ -86,8 +86,20 @@ struct SettingsView: View {
     /// under it (the row starts as plain content).
     @State private var headerPinned = false
     @State private var gapHeight: CGFloat = 0
+    /// The row the command bar just jumped to, tinted while it is set.
+    @State private var highlightedRow: String?
 
     private var content: some View {
+        ScrollViewReader { proxy in
+            scrollArea
+                .environment(\.highlightedSetting, highlightedRow)
+                .onChange(of: appState.settingsFocusRow, initial: true) { _, row in
+                    if let row { jump(to: row, proxy: proxy) }
+                }
+        }
+    }
+
+    private var scrollArea: some View {
         GeometryReader { geo in
             // The content area runs under the transparent titlebar; the
             // scroll view takes that band too so the pinned row covers it.
@@ -149,12 +161,79 @@ struct SettingsView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            // One scroll view per tab: each pane opens at its top. With a
+            // shared one, a trackpad scroll down a long pane then a click on
+            // Displays drew a blank pane, and every tab stayed blank after
+            // (2026-10-04) — the old offset outlived the content it fit.
+            .id(appState.settingsTab)
             .ignoresSafeArea(edges: .top)
             .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y >= gapHeight - 0.5 } action: { _, pinned in
                 headerPinned = pinned
             }
         }
         .background(Color(nsColor: .textBackgroundColor).opacity(0.35))
+    }
+}
+
+extension SettingsView {
+    /// Scroll a row the command bar named into view and tint it once. The
+    /// pane under a fresh scroll view is not laid out for a beat, so the
+    /// scroll waits for it.
+    fileprivate func jump(to row: String, proxy: ScrollViewProxy) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(150))
+            guard appState.settingsFocusRow == row else { return }
+            appState.settingsFocusRow = nil
+            withAnimation(.easeInOut(duration: 0.3)) {
+                proxy.scrollTo(SettingAnchor.scrollID(row), anchor: .center)
+            }
+            highlightedRow = row
+            // Held a moment, then the tint fades out over a second.
+            try? await Task.sleep(for: .milliseconds(500))
+            if highlightedRow == row { highlightedRow = nil }
+        }
+    }
+}
+
+// MARK: - Jumping to a row
+
+private struct HighlightedSettingKey: EnvironmentKey {
+    static let defaultValue: String? = nil
+}
+
+extension EnvironmentValues {
+    fileprivate var highlightedSetting: String? {
+        get { self[HighlightedSettingKey.self] }
+        set { self[HighlightedSettingKey.self] = newValue }
+    }
+}
+
+extension View {
+    /// Marks a row the command bar can jump to (`SettingsIndex` ids): found
+    /// by id for the scroll, and tinted softly while it is the one jumped to.
+    fileprivate func settingAnchor(_ id: String) -> some View {
+        modifier(SettingAnchor(id: id))
+    }
+}
+
+private struct SettingAnchor: ViewModifier {
+    static func scrollID(_ id: String) -> String { "setting.\(id)" }
+
+    let id: String
+    @Environment(\.highlightedSetting) private var highlighted
+
+    func body(content: Content) -> some View {
+        let lit = highlighted == id
+        content
+            .background {
+                // Fill, never an outline; reaches a little past the row.
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(PelmetAccent.accent.opacity(lit ? 0.16 : 0))
+                    .padding(-6)
+                    .animation(lit ? .easeOut(duration: 0.15) : .easeOut(duration: 1.0), value: lit)
+                    .allowsHitTesting(false)
+            }
+            .id(Self.scrollID(id))
     }
 }
 
@@ -524,7 +603,7 @@ struct SettingToggleRow: View {
     }
 }
 
-/// Six glyphs for the menu bar icon, drawn at bar size. Picking one repaints
+/// Seven glyphs for the menu bar icon, drawn at bar size. Picking one repaints
 /// the live status item through settingsChanged().
 struct StatusIconPicker: View {
     @Binding var selection: StatusIconStyle
@@ -532,7 +611,7 @@ struct StatusIconPicker: View {
     var body: some View {
         HStack(spacing: 2) {
             ForEach(StatusIconStyle.allCases) { style in
-                StatusIconTile(symbol: style.symbol(revealed: false), selected: selection == style) {
+                StatusIconTile(symbol: style.symbol(revealed: false), size: style.symbolPointSize ?? 13, selected: selection == style) {
                     selection = style
                 }
             }
@@ -545,6 +624,7 @@ struct StatusIconPicker: View {
 
 private struct StatusIconTile: View {
     let symbol: String
+    let size: Double
     let selected: Bool
     let action: () -> Void
     @State private var hovered = false
@@ -552,7 +632,7 @@ private struct StatusIconTile: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: size, weight: .medium))
                 .foregroundStyle(selected ? PelmetAccent.accent : .secondary)
                 .frame(width: 30, height: 24)
                 .background(
@@ -625,6 +705,13 @@ private struct GeneralPane: View {
     @Environment(AppState.self) private var appState
     @State private var language = AppLanguage.current
 
+    /// Picks the command bar remembers; the revision makes this re-read when
+    /// it saves or resets.
+    private var searchPicks: Int {
+        _ = appState.searchHistoryRevision
+        return appState.commandBar.historyPickCount
+    }
+
     var body: some View {
         SettingsCard {
             SettingToggleRow(
@@ -635,12 +722,14 @@ private struct GeneralPane: View {
                         : SMAppService.mainApp.unregister()
                 }
             )
+            .settingAnchor("launchAtLogin")
             SettingToggleRow(
                 title: "Show Pelmet icon in the menu bar",
                 isOn: binding(\.showStatusItem, onSet: { enabled in
                     if !enabled { showIconlessHint() }
                 })
             )
+            .settingAnchor("showStatusItem")
             if appState.settings.showStatusItem {
                 SettingRow(title: "Icon") {
                     StatusIconPicker(selection: binding(\.statusIconStyle))
@@ -653,6 +742,33 @@ private struct GeneralPane: View {
             ) {
                 ShortcutRecorder(shortcut: binding(\.hotkey), fallback: .default)
             }
+            .settingAnchor("hotkey")
+            SettingRow(
+                title: "Show Always-Hidden Too",
+                caption: hotkeyCaption(appState.settings.alwaysHiddenHotkey, conflict: appState.alwaysHiddenHotkeyConflict,
+                                       otherwise: "Everything at once, press again to hide it all.")
+            ) {
+                ShortcutRecorder(shortcut: binding(\.alwaysHiddenHotkey), fallback: .alwaysHiddenDefault)
+            }
+            SettingRow(
+                title: "Search the menu bar",
+                caption: hotkeyCaption(appState.settings.searchHotkey, conflict: appState.searchHotkeyConflict,
+                                       otherwise: "Type a few letters, press Return, and you're in that icon's menu.")
+            ) {
+                ShortcutRecorder(shortcut: binding(\.searchHotkey), fallback: .searchDefault)
+            }
+            .settingAnchor("searchHotkey")
+            SettingRow(
+                title: "Reset Search History",
+                caption: searchPicks == 0
+                    ? "Nothing to reset yet. Pelmet learns from the icons you open with Search."
+                    : "Forgets which icons you open and what you typed to find them. Shortcuts and aliases stay."
+            ) {
+                Button("Reset") { appState.commandBar.resetHistory() }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(searchPicks == 0)
+            }
             SettingRow(
                 title: "Open Settings",
                 caption: hotkeyCaption(appState.settings.settingsHotkey, conflict: appState.settingsHotkeyConflict,
@@ -660,6 +776,7 @@ private struct GeneralPane: View {
             ) {
                 ShortcutRecorder(shortcut: binding(\.settingsHotkey), fallback: .settingsDefault)
             }
+            .settingAnchor("settingsHotkey")
             SettingToggleRow(
                 // Named, not spelled out: a sentence long enough to say the
                 // whole thing ("Right-click the menu bar for Pelmet's menu")
@@ -677,6 +794,7 @@ private struct GeneralPane: View {
                     }
                 )
             )
+            .settingAnchor("rightClickMenu")
             .disabled(!appState.settings.showStatusItem)
             // "Without it" is advice for a state you are not in while the
             // icon is there — it belongs to the card only once it applies.
@@ -703,6 +821,7 @@ private struct GeneralPane: View {
                     AppLanguage.offerRelaunch()
                 }
             }
+            .settingAnchor("language")
         }
 
         SettingsCard(title: "Permissions") {
@@ -720,6 +839,7 @@ private struct GeneralPane: View {
                     }
                 }
             }
+            .settingAnchor("accessibility")
             SettingRow(
                 title: "Screen Recording",
                 caption: appState.screenRecordingGranted
@@ -734,6 +854,7 @@ private struct GeneralPane: View {
                     }
                 }
             }
+            .settingAnchor("screenRecording")
         }
         .task {
             // The grant lands in System Settings, outside our window —
@@ -784,10 +905,12 @@ private struct BehaviorPane: View {
         SettingsCard(title: "Animation") {
             AnimationShowcase(selection: binding(\.revealAnimation))
         }
+        .settingAnchor("animation")
 
         SettingsCard(title: "Icon spacing") {
             IconSpacingRow()
         }
+        .settingAnchor("iconSpacing")
 
         SettingsCard(title: "Reveal") {
             SettingToggleRow(
@@ -795,6 +918,7 @@ private struct BehaviorPane: View {
                 caption: "Hands-free: rest the pointer on the right half of the menu bar.",
                 isOn: binding(\.revealTriggers.hoverEnabled)
             )
+            .settingAnchor("hoverReveal")
             if appState.settings.revealTriggers.hoverEnabled {
                 SettingSliderRow(
                     title: "Hover delay",
@@ -803,13 +927,17 @@ private struct BehaviorPane: View {
                     step: 0.1,
                     format: "%.1fs"
                 )
+                .settingAnchor("hoverDelay")
             }
             SettingToggleRow(title: "Reveal on click in empty menu bar area", isOn: binding(\.revealTriggers.clickEnabled))
+                .settingAnchor("clickReveal")
             SettingToggleRow(title: "Double-click reveals always-hidden too", isOn: binding(\.revealTriggers.doubleClickForAlwaysHidden))
+                .settingAnchor("doubleClickReveal")
         }
 
         SettingsCard(title: "Auto-rehide") {
             SettingToggleRow(title: "Automatically rehide", isOn: binding(\.autoRehide))
+                .settingAnchor("autoRehide")
             if appState.settings.autoRehide {
                 SettingSliderRow(
                     title: "After",
@@ -821,6 +949,7 @@ private struct BehaviorPane: View {
                 )
             }
             SettingToggleRow(title: "Rehide when clicking elsewhere", isOn: binding(\.rehideOnClickElsewhere))
+                .settingAnchor("rehideElsewhere")
         }
 
         SettingsCard(title: "System extras") {
@@ -840,6 +969,7 @@ private struct BehaviorPane: View {
                 )
                 .disabled(appState.settings.replacesCollateralExtras)
             }
+            .settingAnchor("systemExtras")
             SettingToggleRow(
                 title: "Clicking the clock opens Notification Center",
                 caption: appState.screenRecordingGranted
@@ -847,6 +977,7 @@ private struct BehaviorPane: View {
                     : "Notification Center still opens from the clock, even with icons hidden. Pelmet handles the click; without Screen Recording the hidden icons flash by for an instant. Off, the two-finger swipe from the trackpad's right edge still works.",
                 isOn: binding(\.clockClickOpensNotificationCenter)
             )
+            .settingAnchor("clockClick")
             if appState.settings.clockClickOpensNotificationCenter {
                 SettingRow(
                     title: "Keyboard shortcut",

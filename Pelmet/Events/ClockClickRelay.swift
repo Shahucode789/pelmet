@@ -205,6 +205,25 @@ nonisolated final class ClockClickRelay: @unchecked Sendable {
         return CGPoint(x: clockMaxX - width / 2, y: bounds.minY + bandHeight / 2)
     }
 
+    /// The clock under `point` by the tap's own geometry: where a replayed
+    /// click can land without moving the pointer. A posted click drags the
+    /// cursor to its own location, so a replay at where the click LANDED
+    /// yanked a hand that had moved on back to that spot ~250ms later, and
+    /// one at the clock's centre pulled it there and back (#74). The live
+    /// pointer is the replay point whenever it is still on the clock.
+    /// Opening needs the clock itself (a click in the dot zone past it is
+    /// the dot's); closing takes the whole zone, the panel dismisses on any
+    /// click outside it and the dot's popover never shows for that one
+    /// (probed 2026-10-02: tagged click on the lit indicator, panel gone,
+    /// no popover).
+    func isOnClock(_ point: CGPoint, dotZoneIncluded: Bool) -> Bool {
+        lock.withLock {
+            guard isOnClock(point) else { return false }
+            guard !dotZoneIncluded, let insetFromRight, let display = Self.display(under: point) else { return true }
+            return point.x < CGDisplayBounds(display).maxX - insetFromRight
+        }
+    }
+
     static func display(under point: CGPoint) -> CGDirectDisplayID? {
         var display: CGDirectDisplayID = 0
         var count: UInt32 = 0
@@ -230,6 +249,29 @@ nonisolated final class ClockClickRelay: @unchecked Sendable {
         }
     }
 
+    /// Notification Center's process. A window's `kCGWindowOwnerName` is the
+    /// app's name in the user's language — "알림 센터" on a Korean Mac — so
+    /// matching "Notification Center" only ever worked on English systems.
+    /// Elsewhere every check read the panel as closed: the shortcut pressed
+    /// again 0.6s after a panel that had fully opened, closing it, and the
+    /// panel's windows were counted as backdrop. The bundle id is the same
+    /// in every language.
+    static let notificationCenterBundleID = "com.apple.notificationcenterui"
+
+    static func notificationCenterPID() -> pid_t? {
+        NSRunningApplication.runningApplications(withBundleIdentifier: notificationCenterBundleID).first?.processIdentifier
+    }
+
+    /// Whether a window-list entry is Notification Center's, by its owner's
+    /// pid. Without a pid (the process not found) the English name stands in,
+    /// which is what was matched before.
+    static func isNotificationCenterWindow(_ window: [String: Any], pid: pid_t?) -> Bool {
+        if let pid {
+            return (window[kCGWindowOwnerPID as String] as? Int32) == pid
+        }
+        return window[kCGWindowOwnerName as String] as? String == "Notification Center"
+    }
+
     /// Notification Center's panel is on screen: its process shows one
     /// display-sized window at layer 21 while open, none while closed.
     /// Desktop widgets belong to the same process at the desktop layer
@@ -238,8 +280,9 @@ nonisolated final class ClockClickRelay: @unchecked Sendable {
     /// never ran and the #51 shade stayed on from the first frame).
     @MainActor static func notificationCenterIsOpen() -> Bool {
         guard let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return false }
+        let pid = notificationCenterPID()
         return windows.contains { window in
-            guard window[kCGWindowOwnerName as String] as? String == "Notification Center",
+            guard isNotificationCenterWindow(window, pid: pid),
                   let layer = window[kCGWindowLayer as String] as? Int, layer >= 0,
                   let bounds = window[kCGWindowBounds as String] as? [String: CGFloat],
                   let height = bounds["Height"] else { return false }
@@ -262,6 +305,27 @@ nonisolated final class ClockClickRelay: @unchecked Sendable {
 
     @MainActor static func press(_ element: AXUIElement) -> Bool {
         AXUIElementPerformAction(element, kAXPressAction as CFString) == .success
+    }
+
+    /// The macOS build on which the clock's press never brought the panel
+    /// up: a click whose press went out and waited with the assertion down,
+    /// and no panel by the end of it. Only later builds wire the press to
+    /// Notification Center — on the 2026-09-03 beta it was dead even with no
+    /// assertion held, and on 27.0.1 every click turned press lost the
+    /// panel (#74). Such a Mac replays the click instead, the path every
+    /// direct click took before 0.3.1-beta.4. Kept per build, so an update
+    /// tries the press again.
+    private static let pressDeadKey = "pelmet.clockPressDeadOnBuild"
+    private static var osBuild: String { ProcessInfo.processInfo.operatingSystemVersionString }
+
+    @MainActor static var pressNeverOpensPanel: Bool {
+        UserDefaults.standard.string(forKey: pressDeadKey) == osBuild
+    }
+
+    @MainActor static func notePressNeverOpensPanel() {
+        guard !pressNeverOpensPanel else { return }
+        UserDefaults.standard.set(osBuild, forKey: pressDeadKey)
+        PelmetLog.log("clock: the press never opened the panel on \(osBuild) — clicks are replayed from now on")
     }
 
     /// A real HID-source click with click state set — the agent ignores

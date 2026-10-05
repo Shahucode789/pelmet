@@ -31,20 +31,17 @@ struct ApplyBarButton: View {
             .buttonStyle(.plain)
             .disabled(appState.applying)
             .help("Add a divider to the bar — click its tile to pick a style")
-            // The pass runs silently with the cursor hidden (blind spot 3):
-            // say what it did, or people press it twice.
+            // A pass that moved everything says so through the button, grey
+            // once the bar matches. Only what it couldn't move needs words
+            // (#60: "Moved 1" stayed up long after anyone cared).
             if !appState.applying, let report = appState.applyReport {
-                Group {
-                    let notMoved = report.failed.count + report.skipped.filter { $0.why == .notOnScreen }.count
-                    if notMoved == 0 {
-                        Text("Moved \(report.applied.count)")
-                    } else {
-                        Text("Moved \(report.applied.count), \(notMoved) not moved")
-                            .help("Icons behind macOS's « have no place to be dragged from yet")
-                    }
+                let notMoved = report.failed.count + report.skipped.filter { $0.why == .notOnScreen }.count
+                if notMoved > 0 {
+                    Text("\(notMoved) not moved")
+                        .help("Icons behind macOS's « have no place to be dragged from yet")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
-                .font(.callout)
-                .foregroundStyle(.secondary)
             }
             if !appState.settings.orderEdits.isEmpty, !appState.applying {
                 Button("Discard") { appState.discardOrderEdits() }
@@ -428,74 +425,7 @@ private struct ItemTile: View {
         }
     }
 
-    private var displayName: String {
-        if item.id.bundleID == PelmetBundle.textInputAgentID {
-            return InputSourcePresentation.shared.name
-        }
-        // Pelmet's own items: name the thing, not the app that hosts it.
-        switch item.id.pelmetItem {
-        case .separator: return String(localized: "Separator")
-        case .mediaControls: return String(localized: "Media")
-        case .cameraMic: return String(localized: "Camera")
-        case .airdrop: return String(localized: "AirDrop")
-        case .timer: return String(localized: "Timer")
-        case .userSwitching: return String(localized: "Users")
-        case .timeMachine: return String(localized: "Time Machine")
-        case .siri: return String(localized: "Siri")
-        case .focus: return String(localized: "Focus")
-        default: break
-        }
-        // SystemUIServer's extras enumerate as one item titled with every
-        // extra it shows ("Siri, TimeMachine"): name each, comma-joined.
-        if item.id.bundleID == PelmetBundle.systemUIServerID,
-           case .status(_, let title) = item.id.parsed {
-            let names = title.components(separatedBy: ", ").map { extra -> String in
-                switch extra {
-                case "TimeMachine": String(localized: "Time Machine")
-                case "Item-0": String(localized: "System")
-                default: extra
-                }
-            }
-            return names.joined(separator: ", ")
-        }
-        if MenuBarPolicy.systemItem(for: item.id) == .primaryBentoBox {
-            return String(localized: "Control Center")
-        }
-        if item.id.rawValue.contains("::com.apple.menuextra.") {
-            let suffix = item.id.rawValue.components(separatedBy: ".").last ?? String(localized: "System")
-            return suffix.replacingOccurrences(of: "-", with: " ").capitalized
-        }
-        // Apple's login-item extras are named after their executable
-        // ("PasswordsMenuBarExtra", "WeatherMenu"); the tile says what the
-        // icon is: the app that ships it.
-        if let bundle = item.id.bundleID, MenuBarPolicy.isBundleHideableAppleHost(bundle),
-           let shipping = Self.shippingAppName(for: bundle) {
-            return shipping
-        }
-        return item.appName ?? item.id.bundleID?.components(separatedBy: ".").last ?? "?"
-    }
-
-    /// Finder's localized name of the app a login-item extra ships inside
-    /// (…/Weather.app/Contents/Library/LoginItems/WeatherMenu.app → "Weather").
-    /// nil for a host that is its own app. One LaunchServices lookup per
-    /// bundle, then cached: the board asks on every tile render.
-    private static var shippingAppNames: [String: String?] = [:]
-    private static func shippingAppName(for bundle: String) -> String? {
-        if let cached = shippingAppNames[bundle] { return cached }
-        var name: String?
-        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle) {
-            let parts = url.pathComponents
-            // <App>.app / Contents / Library / LoginItems / <Extra>.app
-            if parts.count >= 5, parts[parts.count - 2] == "LoginItems", parts[parts.count - 3] == "Library",
-               parts[parts.count - 4] == "Contents", parts[parts.count - 5].hasSuffix(".app") {
-                let app = url.deletingLastPathComponent().deletingLastPathComponent()
-                    .deletingLastPathComponent().deletingLastPathComponent()
-                name = FileManager.default.displayName(atPath: app.path)
-            }
-        }
-        shippingAppNames[bundle] = name
-        return name
-    }
+    private var displayName: String { ItemNaming.displayName(for: item) }
 
     private var isSystemIcon: Bool {
         MenuBarPolicy.systemItem(for: item.id) != nil
@@ -697,6 +627,8 @@ private struct ItemTile: View {
                 name: displayName,
                 hasLauncher: hasLauncher,
                 helperHosted: appState.isBundlelessHost(item.id),
+                destroyed: appState.isDestroyedHost(item.id),
+                outsideApplications: appState.runsOutsideApplications(item.id),
                 immovable: isImmovable && !isUnhideable,
                 pinnedBySystem: isPinnedBySystem,
                 missingReplacements: item.id.bundleID == PelmetBundle.systemUIServerID
@@ -777,6 +709,11 @@ private struct InactiveIconCard: View {
     /// The icon's host is a bundle-less helper — the one cause Pelmet can
     /// name; otherwise the bar simply kept the icon when asked to hide it.
     let helperHosted: Bool
+    /// The bar took the icon down although Pelmet allowed it.
+    let destroyed: Bool
+    /// …and the app runs from outside an Applications folder, the one
+    /// cause of that we know.
+    let outsideApplications: Bool
     /// Hides fine, won't be moved: the app's tray swallows synthetic drags.
     let immovable: Bool
     /// Hides fine, won't be moved, and no launcher applies: macOS itself
@@ -856,6 +793,11 @@ private struct InactiveIconCard: View {
                     .font(.headline)
                 if helperHosted {
                     Text("\(name) runs its menu bar icon from a helper macOS doesn't count as an app, so it won't show.")
+                } else if destroyed, outsideApplications {
+                    Text("macOS takes \(name) off the bar while anything is hidden, because it runs from outside Applications. Open it from the Applications folder instead.")
+                } else if destroyed {
+                    // Pelmet never asked to hide it (#66): the bar took it.
+                    Text("macOS takes \(name) off the bar while anything is hidden, even though Pelmet leaves it visible.")
                 } else {
                     Text("macOS kept it in the bar when Pelmet asked to hide it.")
                 }
@@ -970,7 +912,9 @@ private struct PelmetItemsStrip: View {
                 ) { toggleKind(.mediaControls, on: $0) }
                 PelmetItemRow(
                     symbol: "video.fill", title: "Camera & mic indicator",
-                    caption: "Know when your camera or mic is on.",
+                    caption: appState.screenRecordingGranted
+                        ? "Know when your camera, mic or SharePlay is on."
+                        : "Know when your camera, mic or SharePlay is on. Without Screen Recording the hidden icons flash by for an instant when you click it.",
                     isOn: hasKind(.cameraMicIndicator)
                 ) { toggleKind(.cameraMicIndicator, on: $0) }
                 PelmetItemRow(
@@ -1005,6 +949,11 @@ private struct PelmetItemsStrip: View {
                     caption: "Switch user or lock the screen in a click.",
                     isOn: hasKind(.userSwitching)
                 ) { toggleKind(.userSwitching, on: $0) }
+                PelmetItemRow(
+                    symbol: "square.2.layers.3d.top.filled", title: "Shortcuts",
+                    caption: "Your whole Shortcuts library in one menu.",
+                    isOn: hasKind(.shortcutsMenu)
+                ) { toggleKind(.shortcutsMenu, on: $0) }
                 ForEach(appState.settings.extraItems.filter { $0.kind == .shortcut }) { spec in
                     HStack(spacing: 8) {
                         Image(systemName: spec.symbol ?? "bolt.fill")
