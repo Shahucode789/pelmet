@@ -1,0 +1,125 @@
+name: Build and update patched Pelmet
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * *'
+  push:
+    paths:
+      - '.github/workflows/build-pelmet.yml'
+      - 'native-now-playing.patch'
+      - 'update-public-key.txt'
+      - 'prepare-update.py'
+permissions:
+  contents: write
+concurrency:
+  group: patched-pelmet-release
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Check upstream and apply protected patch
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 prepare-update.py
+      - name: Verify toolchain and test
+        if: steps.prepare.outputs.needed == 'true'
+        working-directory: upstream-build
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          SDK_VERSION=$(xcrun --sdk macosx --show-sdk-version)
+          [[ "${SDK_VERSION%%.*}" -ge 27 ]]
+          swift test --package-path Packages/PelmetCore
+          swift test --package-path Packages/PelmetEngine
+      - name: Install pinned XcodeGen
+        if: steps.prepare.outputs.needed == 'true'
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 -o xcodegen.zip https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip
+          echo '4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806  xcodegen.zip' | shasum -a 256 -c -
+          unzip -q xcodegen.zip
+          sudo PREFIX=/usr/local xcodegen/install.sh
+      - name: Build universal patched app
+        if: steps.prepare.outputs.needed == 'true'
+        working-directory: upstream-build
+        run: |
+          set -euo pipefail
+          xcodegen generate
+          xcodebuild -project Pelmet.xcodeproj -scheme Pelmet -configuration Release \
+            -destination 'generic/platform=macOS' -derivedDataPath build \
+            ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= \
+            MARKETING_VERSION="$(cat ../upstream-version.txt)-native" \
+            CURRENT_PROJECT_VERSION="$((10000 + GITHUB_RUN_NUMBER))" build
+      - name: Verify app starts before publishing
+        if: steps.prepare.outputs.needed == 'true'
+        working-directory: upstream-build
+        run: |
+          set -euo pipefail
+          build/Build/Products/Release/Pelmet.app/Contents/MacOS/Pelmet > ../startup.log 2>&1 &
+          APP_PID=$!
+          sleep 5
+          if ! kill -0 "$APP_PID" 2>/dev/null; then
+            cat ../startup.log
+            echo 'App exited during startup; refusing to publish.'
+            exit 1
+          fi
+          kill "$APP_PID"
+      - name: Package app and corresponding source
+        if: steps.prepare.outputs.needed == 'true'
+        working-directory: upstream-build
+        run: |
+          set -euo pipefail
+          APP=build/Build/Products/Release/Pelmet.app
+          codesign --verify --deep --strict "$APP"
+          lipo -archs "$APP/Contents/MacOS/Pelmet"
+          mkdir -p ../artifacts/updates
+          ditto -c -k --keepParent "$APP" ../artifacts/updates/Pelmet-native-controls.zip
+          git diff --binary > ../artifacts/complete-build.patch
+          git archive HEAD -o ../artifacts/pelmet-base-source.zip
+          cp LICENSE ../artifacts/LICENSE
+          cp ../build-notes.md ../artifacts/BUILD-NOTES.md
+          shasum -a 256 ../artifacts/updates/Pelmet-native-controls.zip > ../artifacts/SHA256SUMS
+      - name: Sign update and feed
+        if: steps.prepare.outputs.needed == 'true'
+        env:
+          UPDATE_KEY: ${{ secrets.PELMET_UPDATE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$UPDATE_KEY" || { echo 'Missing PELMET_UPDATE_SIGNING_KEY repository secret'; exit 1; }
+          KEY_FILE="$RUNNER_TEMP/pelmet-update-key"
+          umask 077
+          printf '%s' "$UPDATE_KEY" > "$KEY_FILE"
+          trap 'rm -f "$KEY_FILE"' EXIT
+          TAG="native-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          upstream-build/build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_appcast \
+            --ed-key-file "$KEY_FILE" \
+            --download-url-prefix "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/" artifacts/updates
+          test -s artifacts/updates/appcast.xml
+          upstream-build/build/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update \
+            --ed-key-file "$KEY_FILE" --verify artifacts/updates/appcast.xml
+      - name: Publish only a complete, signed build
+        if: steps.prepare.outputs.needed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="native-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          gh release create "$TAG" --draft --target "$GITHUB_SHA" \
+            --title "Pelmet $(cat upstream-version.txt) with native controls" \
+            --notes-file build-notes.md artifacts/updates/* artifacts/*.zip artifacts/*.patch artifacts/LICENSE artifacts/*.md artifacts/SHA256SUMS
+          gh release edit "$TAG" --draft=false --latest
+      - name: Upload build artifacts
+        if: success() && steps.prepare.outputs.needed == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Pelmet-native-controls
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 14
