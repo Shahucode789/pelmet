@@ -1,0 +1,284 @@
+diff --git a/Packages/PelmetCore/Sources/PelmetCore/SettingsStore.swift b/Packages/PelmetCore/Sources/PelmetCore/SettingsStore.swift
+index 6110fb4..302122c 100644
+--- a/Packages/PelmetCore/Sources/PelmetCore/SettingsStore.swift
++++ b/Packages/PelmetCore/Sources/PelmetCore/SettingsStore.swift
+@@ -373,19 +373,18 @@ public struct SettingsStore: Codable, Equatable, Sendable {
+     /// consistently hidden instead of jumping in and out on every transition.
+     public var hideSystemExtras: Bool = SettingsDefaults.hideSystemExtras
+ 
+-    /// A Pelmet item that stands in for one of those collateral extras is
+-    /// on. It exists to replace the system's, so the system's must stay
+-    /// out: with "Show while revealed" the camera pill came back on every
+-    /// hover, the replica deferred to it, and the two swapped places on
+-    /// every transition (#39).
++    /// Whether Pelmet has a replacement for a collateral-hidden extra.
++    /// This is informational: replacing one extra must not silently suppress
++    /// unrelated native controls such as Now Playing.
+     public var replacesCollateralExtras: Bool {
+         extraItems.contains { ExtraKind.collateralReplicas.contains($0.kind) }
+     }
+ 
+-    /// What the engine holds: the user's choice, forced on while a replica
+-    /// is on.
++    /// Honor the user's explicit choice even when a replica is enabled.
++    /// While icons are actually concealed macOS still hides its extras, but
++    /// revealing the whole bar can release the assertion and restore them.
+     public var effectiveHideSystemExtras: Bool {
+-        hideSystemExtras || replacesCollateralExtras
++        hideSystemExtras
+     }
+ 
+     /// Right-clicking an empty spot on the menu bar opens Pelmet's menu.
+diff --git a/Packages/PelmetCore/Tests/PelmetCoreTests/SettingsStoreTests.swift b/Packages/PelmetCore/Tests/PelmetCoreTests/SettingsStoreTests.swift
+index b0996d9..09b1b2c 100644
+--- a/Packages/PelmetCore/Tests/PelmetCoreTests/SettingsStoreTests.swift
++++ b/Packages/PelmetCore/Tests/PelmetCoreTests/SettingsStoreTests.swift
+@@ -3,21 +3,21 @@ import Testing
+ @testable import PelmetCore
+ 
+ struct SettingsStoreTests {
+-    // "Show while revealed" is overridden while a Pelmet replica of a
+-    // collateral extra is on (#39: the camera pill came back on every hover).
+-    @Test func collateralReplicaForcesTheSystemExtrasHold() {
+-        var settings = SettingsStore()
+-        settings.hideSystemExtras = false
+-        settings.extraItems = []
+-        #expect(!settings.effectiveHideSystemExtras)
+-        settings.extraItems = [ExtraItemSpec(kind: .siri)]
+-        #expect(!settings.effectiveHideSystemExtras)
+-        settings.extraItems = [ExtraItemSpec(kind: .cameraMicIndicator)]
+-        #expect(settings.replacesCollateralExtras)
+-        #expect(settings.effectiveHideSystemExtras)
+-        settings.hideSystemExtras = true
+-        settings.extraItems = []
+-        #expect(settings.effectiveHideSystemExtras)
++    // A camera replacement must not override an explicit request to restore
++    // native Now Playing (and the other extras) when the bar is revealed.
++    @Test func collateralReplicasRespectSystemExtrasChoice() throws {
++        for kind in ExtraKind.collateralReplicas {
++            var settings = SettingsStore()
++            settings.hideSystemExtras = false
++            settings.extraItems = [ExtraItemSpec(kind: kind)]
++            #expect(settings.replacesCollateralExtras)
++            #expect(!settings.effectiveHideSystemExtras)
++            let restored = try JSONDecoder().decode(
++                SettingsStore.self, from: JSONEncoder().encode(settings))
++            #expect(!restored.effectiveHideSystemExtras)
++            settings.hideSystemExtras = true
++            #expect(settings.effectiveHideSystemExtras)
++        }
+     }
+ 
+     // Pending order edits survive a quit (docs/CORE-SETS.md M1), and a blob
+diff --git a/Packages/PelmetEngine/Tests/PelmetEngineTests/ConvergePlanTests.swift b/Packages/PelmetEngine/Tests/PelmetEngineTests/ConvergePlanTests.swift
+index 599bd60..dc15c33 100644
+--- a/Packages/PelmetEngine/Tests/PelmetEngineTests/ConvergePlanTests.swift
++++ b/Packages/PelmetEngine/Tests/PelmetEngineTests/ConvergePlanTests.swift
+@@ -221,6 +221,26 @@ import PelmetCore
+         #expect(plan.allowedBundles.isEmpty)
+     }
+ 
++    @Test func nativeExtrasReturnWhenRevealedDespiteCameraReplica() {
++        var settings = SettingsStore()
++        settings.hideSystemExtras = false
++        settings.extraItems = [ExtraItemSpec(kind: .cameraMicIndicator)]
++        let layout = model([velja: .hidden])
++        let revealed = ConvergePlan.compute(
++            model: layout, liveIDs: [], carriedConcealed: [velja],
++            runningBundles: ["com.sindresorhus.Velja"],
++            revealedSections: [.hidden],
++            steadyExtras: settings.effectiveHideSystemExtras, exemptBundles: exempt)
++        #expect(revealed.dropAssertion)
++        #expect(revealed.concealed.isEmpty)
++        let collapsed = ConvergePlan.compute(
++            model: layout, liveIDs: [velja], carriedConcealed: [],
++            runningBundles: ["com.sindresorhus.Velja"], revealedSections: [],
++            steadyExtras: settings.effectiveHideSystemExtras, exemptBundles: exempt)
++        #expect(!collapsed.dropAssertion)
++        #expect(collapsed.concealed.contains(velja))
++    }
++
+     @Test func steadyExtrasHoldsAssertionWithNothingConcealable() {
+         let plan = ConvergePlan.compute(
+             model: model([:]),
+diff --git a/Pelmet/App/AppState.swift b/Pelmet/App/AppState.swift
+index 7468673..2d15acf 100644
+--- a/Pelmet/App/AppState.swift
++++ b/Pelmet/App/AppState.swift
+@@ -564,9 +564,6 @@ final class AppState {
+                 )
+             }
+             await engine.setSteadyExtras(settings.effectiveHideSystemExtras)
+-            if !settings.hideSystemExtras, settings.replacesCollateralExtras {
+-                PelmetLog.log("extras: system extras held hidden — a Pelmet item replaces one")
+-            }
+             // Apps that first appeared while Pelmet wasn't running route to the
+             // new-items section before the first converge. Nothing moves:
+             // membership hides them where they sit (docs/CORE-SETS.md).
+@@ -1241,10 +1238,13 @@ final class AppState {
+     private func settleAfterAudioVideoRelay(_ generation: Int) async {
+         let deadline = Date().addingTimeInterval(AppTiming.clockBlinkCoverDeadline)
+         let screenMaxX = NSScreen.screens.first?.frame.maxX ?? .greatestFiniteMagnitude
++        let expectsNativePillHidden = await engine.holdsAssertion
+         func settled(_ snap: EngineSnapshot) -> Bool {
+             let frames = snap.items.compactMap(\.frame).filter { $0.width > 4 && PlacementGeometry.isPrimary($0, screenMaxX: screenMaxX) }
+-            return !snap.items.contains { $0.id.rawValue.hasSuffix(AudioVideoPill.identifier) && $0.frame != nil }
+-                && PlacementGeometry.overflowTrapped(frames).isEmpty
++            let nativePillSettled = !expectsNativePillHidden || !snap.items.contains {
++                $0.id.rawValue.hasSuffix(AudioVideoPill.identifier) && $0.frame != nil
++            }
++            return nativePillSettled && PlacementGeometry.overflowTrapped(frames).isEmpty
+         }
+         var snap = await engine.freshSnapshot()
+         var walks = 1
+diff --git a/Pelmet/App/AppTiming.swift b/Pelmet/App/AppTiming.swift
+index 66bf0a5..3d0d2e8 100644
+--- a/Pelmet/App/AppTiming.swift
++++ b/Pelmet/App/AppTiming.swift
+@@ -32,7 +32,7 @@ enum AppTiming {
+     static let clockBlinkCoverDeadline: TimeInterval = 1.5
+     /// Camera & mic relay (#68): longest Apple's pill may take to rejoin
+     /// the AX tree after the drop before the relay gives up on it.
+-    static let audioVideoPillWait: TimeInterval = 1
++    static let audioVideoPillWait: TimeInterval = 2.5
+     /// Notification Center's panel slides in over ~100ms from Pelmet's
+     /// press; the blink cover crossfades from the bare still to the
+     /// under-panel one over that slide, starting at the press.
+diff --git a/Pelmet/Extras/AudioVideoPill.swift b/Pelmet/Extras/AudioVideoPill.swift
+index fb2ed3f..1d9856e 100644
+--- a/Pelmet/Extras/AudioVideoPill.swift
++++ b/Pelmet/Extras/AudioVideoPill.swift
+@@ -88,14 +88,23 @@ enum AudioVideoPill {
+         }
+         let back = Int(-started.timeIntervalSinceNow * 1000)
+         let names = identifiers.map { $0.replacingOccurrences(of: "com.apple.menuextra.", with: "") }
+-        guard let (pill, found) = pill else {
++        guard let (_, found) = pill else {
+             PelmetLog.log("audiovideo: no \(names.joined(separator: "/")) in the bar after \(back)ms (\(walks) walks, first \(firstWalk)ms)")
+             return nil
+         }
+         PelmetLog.log("audiovideo: \(found.replacingOccurrences(of: "com.apple.menuextra.", with: "")) back at \(back)ms (\(walks) walks, first \(firstWalk)ms)")
+-        let before = panelWindows()
++        // A panel dismissed by the initiating click can still be animating
++        // out. Wait before taking the baseline; otherwise a reused window ID
++        // would be excluded from the success check.
++        for _ in 0..<16 where !panelWindows().isEmpty {
++            try? await Task.sleep(for: .milliseconds(25))
++        }
+         for attempt in 1...2 {
+-            let sent = AXUIElementPerformAction(pill, kAXPressAction as CFString) == .success
++            // Dropping the assertion rebuilds menu items. Never retry a stale
++            // AX element retained from the first walk.
++            guard let (currentPill, _) = find(in: app, on: display, identifiers: identifiers) else { continue }
++            let before = panelWindows()
++            let sent = AXUIElementPerformAction(currentPill, kAXPressAction as CFString) == .success
+             let pressed = Date()
+             let until = pressed.addingTimeInterval(verify)
+             repeat {
+diff --git a/Pelmet/Extras/MediaControls.swift b/Pelmet/Extras/MediaControls.swift
+index dc7305f..65475ee 100644
+--- a/Pelmet/Extras/MediaControls.swift
++++ b/Pelmet/Extras/MediaControls.swift
+@@ -287,18 +287,18 @@ final class ExtrasManager {
+             case .cameraMicIndicator:
+                 // Pure indicator, like Apple's: exists ONLY while hardware is
+                 // live, or a SharePlay session with no call (section decides
+-                // where it appears, not whether). Defers to the system pill,
+-                // or Apple's SharePlay icon, when that one is on screen.
++                // where it appears, not whether). Keep Pelmet's glyph available
++                // even while native extras are revealed: its click relays to
++                // Apple's panel for video effects and microphone modes.
+                 let active = (cameraMicMonitor?.isActive ?? false) || (sharePlayStatus?.isLive ?? false)
+-                visible = active && !systemCameraPillVisible && !(appState?.systemSharePlayVisible ?? false)
++                visible = active
+                 updateCameraSymbol(item, spec: spec)
+                 // Re-entering layout (isVisible flip) parks the item wherever
+                 // the agent decides, not at its model slot. Never drag here:
+                 // the activation is app-driven (Sconce opening the camera,
+                 // 2026-08-31) and the synthetic ⌘-drag hijacked the pointer
+-                // mid-task. Debounce the edge — the system pill takes over
+-                // within ~50ms and hides us again — then queue the walk for
+-                // the next reveal settle.
++                // mid-task. Debounce hardware activation before queueing
++                // placement, keeping the icon stable across native-panel opens.
+                 let itemID = Self.itemID(for: spec)
+                 if visible, !lastCameraIndicatorVisible {
+                     cameraPlacementDebounce?.cancel()
+@@ -1074,8 +1074,8 @@ final class ExtrasManager {
+             }
+         case .cameraMicIndicator:
+             // Apple's own pill (video effects, mic mode, Stop Sharing), which
+-            // no assertion lets on the bar (#68). A right-click, or no pill
+-            // to open, goes to Privacy settings for a quick audit.
++            // no assertion lets on the bar (#68). Privacy is an explicit
++            // right-click action only; it cannot configure video effects.
+             let privacy = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")!
+             guard !rightClick else { NSWorkspace.shared.open(privacy); return }
+             guard !AudioVideoPill.clickClosedPanel(), let appState, let button = statusItem.value.button else { return }
+@@ -1085,7 +1085,13 @@ final class ExtrasManager {
+                 ? [AudioVideoPill.sharePlayIdentifier, AudioVideoPill.identifier]
+                 : [AudioVideoPill.identifier]
+             Task { @MainActor in
+-                if !(await appState.openAudioVideoPill(near: point, identifiers: ids)) { NSWorkspace.shared.open(privacy) }
++                if !(await appState.openAudioVideoPill(near: point, identifiers: ids)) {
++                    let alert = NSAlert()
++                    alert.messageText = String(localized: "Couldn’t open Apple’s camera and microphone controls")
++                    alert.informativeText = String(localized: "Keep your camera or microphone active in Zoom or another supported app, then try again. If it is already active, reveal the menu bar and click Apple’s camera or microphone indicator.")
++                    alert.addButton(withTitle: String(localized: "OK"))
++                    alert.runModal()
++                }
+             }
+         case .airdrop:
+             openAirDrop()
+diff --git a/Pelmet/Settings/SettingsView.swift b/Pelmet/Settings/SettingsView.swift
+index 2deb7af..bb3c364 100644
+--- a/Pelmet/Settings/SettingsView.swift
++++ b/Pelmet/Settings/SettingsView.swift
+@@ -971,19 +971,15 @@ private struct BehaviorPane: View {
+         SettingsCard(title: "System extras") {
+             SettingRow(
+                 title: "Now Playing, camera controls, AirDrop, Focus, Timer",
+-                caption: appState.settings.replacesCollateralExtras
+-                    ? "Pelmet's items stand in for these, so Apple's stay hidden. Turn a Pelmet item off to get Apple's back when the bar is revealed."
+-                    : "macOS hides these whenever any icons are concealed — they can only appear while the whole bar is revealed."
++                caption: "macOS hides these whenever any icons are concealed — they can only appear while the whole bar is revealed. This choice also applies when Pelmet replacement items are enabled."
+             ) {
+                 PelmetMenuPicker(
+-                    selection: appState.settings.replacesCollateralExtras
+-                        ? .constant(true) : binding(\.hideSystemExtras),
++                    selection: binding(\.hideSystemExtras),
+                     options: [
+                         (true, LocalizedStringKey("Always hidden")),
+                         (false, LocalizedStringKey("Show while revealed")),
+                     ]
+                 )
+-                .disabled(appState.settings.replacesCollateralExtras)
+             }
+             .settingAnchor("systemExtras")
+             SettingToggleRow(
+diff --git a/docs/FAQ.md b/docs/FAQ.md
+index eadc02c..b3d9c84 100644
+--- a/docs/FAQ.md
++++ b/docs/FAQ.md
+@@ -23,6 +23,21 @@ panel in Control Center. Media controls, Time Machine and Focus can sit in the
+ bar only while active or all the time, the choice is beside each toggle. To
+ turn any Pelmet item off from the bar, ⌘-drag it off.
+ 
++**Why is Apple's Now Playing missing even with the bar expanded?**
++In Settings → Behavior → System extras, choose **Show while revealed**.
++**Always hidden** deliberately holds the assessment assertion even when no
++icons need hiding. The show option now remains available when a Pelmet
++replacement (for example the camera indicator) is enabled; that replacement
++must not force unrelated native controls off. To keep the bar revealed, use
++Settings → Displays → **Expanded**, with no items in Always Hidden.
++Native extras still disappear whenever an assertion is needed to conceal
++icons. This change does not provide a native Now Playing exemption during
++concealment. When native extras return, replacement items may also remain
++visible. Pelmet's camera/mic glyph stays available while hardware is active;
++click it to open Apple's own video-effects and microphone-mode panel. Available
++effects depend on the active app, hardware, and macOS (for example background
++replacement and Voice Isolation). Right-click still opens Privacy settings.
++
+ **How does clicking the clock open Notification Center?**
+ That's Pelmet working around macOS. While any icon is hidden, the system
+ refuses the clock's click to open Notification Center (the same lockdown exam
