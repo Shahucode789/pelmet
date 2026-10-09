@@ -57,6 +57,20 @@ jobs:
             CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= \
             MARKETING_VERSION="$(cat ../upstream-version.txt)-native" \
             CURRENT_PROJECT_VERSION="$((10000 + GITHUB_RUN_NUMBER))" build
+      - name: Sign personal app with approved Sparkle library permission
+        if: steps.prepare.outputs.needed == 'true'
+        working-directory: upstream-build
+        run: |
+          set -euo pipefail
+          python3 - <<'PYTHON'
+          import plistlib
+          with open('../personal-build.entitlements', 'wb') as out:
+              plistlib.dump({'com.apple.security.cs.disable-library-validation': True}, out)
+          PYTHON
+          echo 'Library validation is disabled only for this personal app with user approval, to load Sparkle without an Apple Developer certificate. Hardened runtime and signed-update verification remain enabled.' >> ../build-notes.md
+          codesign --force --sign - --options runtime --timestamp=none \
+            --entitlements ../personal-build.entitlements build/Build/Products/Release/Pelmet.app
+          codesign --verify --deep --strict build/Build/Products/Release/Pelmet.app
       - name: Verify app starts before publishing
         if: steps.prepare.outputs.needed == 'true'
         working-directory: upstream-build
